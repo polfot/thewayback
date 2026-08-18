@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Way Back</title>
+    <link rel="stylesheet" href="css/game.css">
+</head>
+<body>
+    <div id="start-screen">
+        <h1>THE WAY BACK</h1>
+        <label for="player-name">YOUR NAME</label>
+        <input type="text" id="player-name" maxlength="12" placeholder="Nick" autofocus>
+        <label for="dog-name">DOG'S NAME</label>
+        <input type="text" id="dog-name" maxlength="12" placeholder="Rex">
+        <div class="error-msg" id="name-error"></div>
+        <button id="start-btn">START</button>
+    </div>
+
+    <div id="game-wrapper" style="display:none;">
+        <canvas id="game-canvas" width="800" height="520"></canvas>
+    </div>
+
+    <script src="js/data.js?v=28"></script>
+    <script src="js/loader.js?v=28"></script>
+    <script src="js/sprites.js?v=28"></script>
+    <script src="js/game.js?v=28"></script>
+    <script src="js/main.js?v=28"></script>
+</body>
+</html>
