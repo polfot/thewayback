@@ -88,6 +88,44 @@ body {
     height: 14px;
 }
 
+#difficulty-select {
+    display: flex;
+    gap: 6px;
+    margin-top: 20px;
+}
+
+.diff-btn {
+    font-family: var(--font-pixel);
+    font-size: 7px;
+    color: var(--text-dim);
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    padding: 8px 12px;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    transition: border-color 0.2s, color 0.2s;
+}
+
+.diff-btn:hover {
+    border-color: var(--text-dim);
+    color: var(--text);
+}
+
+.diff-btn.selected {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: #1a1a28;
+}
+
+#diff-desc {
+    font-family: var(--font-pixel);
+    font-size: 6px;
+    color: var(--text-dim);
+    margin-top: 6px;
+    height: 12px;
+    text-align: center;
+}
+
 #start-btn {
     font-family: var(--font-pixel);
     font-size: 10px;
@@ -107,4 +145,102 @@ body {
 #start-btn:disabled {
     background: var(--text-dim);
     cursor: not-allowed;
+}
+
+#tutorial-btn {
+    font-family: var(--font-pixel);
+    font-size: 7px;
+    color: var(--text-dim);
+    background: transparent;
+    border: 1px solid var(--panel-border);
+    padding: 8px 20px;
+    margin-top: 12px;
+    cursor: pointer;
+    letter-spacing: 1px;
+}
+
+#tutorial-btn:hover {
+    color: var(--text);
+    border-color: var(--text-dim);
+}
+
+#tutorial-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#tutorial-box {
+    background: var(--panel);
+    border: 2px solid var(--accent);
+    padding: 24px 28px;
+    max-width: 520px;
+    width: 90%;
+    text-align: center;
+}
+
+#tutorial-title {
+    font-family: var(--font-pixel);
+    font-size: 10px;
+    color: var(--accent);
+    margin-bottom: 18px;
+    letter-spacing: 1px;
+}
+
+#tutorial-body {
+    font-family: var(--font-pixel);
+    font-size: 7px;
+    color: var(--text);
+    line-height: 2;
+    text-align: left;
+    min-height: 120px;
+}
+
+#tutorial-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-top: 20px;
+}
+
+.tut-nav-btn {
+    font-family: var(--font-pixel);
+    font-size: 7px;
+    color: var(--text-dim);
+    background: var(--bg);
+    border: 1px solid var(--panel-border);
+    padding: 6px 14px;
+    cursor: pointer;
+}
+
+.tut-nav-btn:hover {
+    color: var(--text);
+    border-color: var(--text-dim);
+}
+
+#tut-page {
+    font-family: var(--font-pixel);
+    font-size: 7px;
+    color: var(--text-dim);
+}
+
+#tut-close {
+    font-family: var(--font-pixel);
+    font-size: 7px;
+    color: var(--text-dim);
+    background: transparent;
+    border: 1px solid var(--panel-border);
+    padding: 6px 18px;
+    margin-top: 14px;
+    cursor: pointer;
+}
+
+#tut-close:hover {
+    color: var(--text);
+    border-color: var(--text-dim);
 }

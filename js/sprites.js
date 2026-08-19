@@ -84,6 +84,39 @@ function drawWater(ctx, deep) {
     ctx.fillRect(18, 18, 10, 2);
 }
 
+function drawSnow(ctx, v) {
+    var bases = ['#c8c8d0', '#bbbbc4'];
+    ctx.fillStyle = bases[v] || bases[0];
+    ctx.fillRect(0, 0, 32, 32);
+    var darks = ['#a8a8b4', '#a0a0ac'];
+    var lights = ['#d8d8e0', '#d0d0d8'];
+    for (var i = 0; i < 35; i++) {
+        var sx = TWB.hash(i + v * 200, 500) % 30;
+        var sy = TWB.hash(500, i + v * 200) % 30;
+        ctx.fillStyle = (i % 3 === 0) ? darks[v] : lights[v];
+        ctx.fillRect(sx, sy, 2, 2);
+    }
+    if (v === 0) {
+        ctx.fillStyle = '#b0b0bc';
+        ctx.fillRect(10, 16, 4, 2);
+        ctx.fillRect(22, 6, 3, 2);
+    }
+}
+
+function drawSnowDirt(ctx) {
+    ctx.fillStyle = '#9a9498';
+    ctx.fillRect(0, 0, 32, 32);
+    for (var i = 0; i < 20; i++) {
+        var dx = (i * 11 + 3) % 28;
+        var dy = (i * 7 + 5) % 28;
+        ctx.fillStyle = (i % 3 === 0) ? '#8a8490' : '#aaa4a8';
+        ctx.fillRect(dx, dy, 2, 2);
+    }
+    ctx.fillStyle = '#b8b4bc';
+    ctx.fillRect(4, 12, 4, 2);
+    ctx.fillRect(18, 22, 5, 2);
+}
+
 function drawShore(ctx) {
     ctx.fillStyle = '#504838';
     ctx.fillRect(0, 0, 32, 32);
@@ -519,6 +552,17 @@ function drawBushBerrySprite(ctx) {
     px(ctx, 6, 5, 1, 1, '#923232');
 }
 
+function drawHerbVikosSprite(ctx) {
+    shadow(ctx, 6, 18, 12, 3);
+    px(ctx, 7, 16, 1, 3, '#2a4a1a');
+    px(ctx, 4, 13, 3, 2, '#3a6a28');
+    px(ctx, 8, 12, 3, 2, '#3a6a28');
+    px(ctx, 6, 10, 3, 2, '#3a6a28');
+    px(ctx, 4, 12, 1, 1, '#4a8a38');
+    px(ctx, 9, 11, 1, 1, '#4a8a38');
+    px(ctx, 7, 9, 1, 1, '#4a8a38');
+}
+
 // === INTERIOR OBJECTS ===
 
 function drawFireplaceSprite(ctx) {
@@ -808,6 +852,9 @@ TWB.initSprites = function() {
     TWB.Sprites.ground[TWB.T_SHORE] = makeCanvas(32, 32, drawShore);
     TWB.Sprites.ground[TWB.T_FLOOR] = makeCanvas(32, 32, drawFloor);
     TWB.Sprites.ground[TWB.T_WALL] = makeCanvas(32, 32, drawWall);
+    TWB.Sprites.ground[TWB.T_SNOW1] = makeCanvas(32, 32, function(c) { drawSnow(c, 0); });
+    TWB.Sprites.ground[TWB.T_SNOW2] = makeCanvas(32, 32, function(c) { drawSnow(c, 1); });
+    TWB.Sprites.ground[TWB.T_SNOW_DIRT] = makeCanvas(32, 32, drawSnowDirt);
 
     TWB.Sprites.charDown = [];
     TWB.Sprites.charUp = [];
@@ -841,6 +888,7 @@ TWB.initSprites = function() {
     TWB.Sprites.stump = makeCanvas(22, 20, drawStumpSprite);
     TWB.Sprites.bush = makeCanvas(30, 24, drawBushSprite);
     TWB.Sprites.bush_berry = makeCanvas(30, 24, drawBushBerrySprite);
+    TWB.Sprites.herb_vikos = makeCanvas(16, 22, drawHerbVikosSprite);
     TWB.Sprites.trap = makeCanvas(20, 16, function(ctx) {
         shadow(ctx, 3, 12, 14, 3);
         px(ctx, 1, 4, 8, 1, '#2a2a20');
@@ -888,6 +936,7 @@ TWB.getSpriteAnchor = function(type) {
         case 'stump': return { x: 11, y: 16 };
         case 'bush': return { x: 15, y: 18 };
         case 'bush_berry': return { x: 15, y: 18 };
+        case 'herb_vikos': return { x: 8, y: 18 };
         case 'trap': return { x: 10, y: 12 };
         case 'fireplace': return { x: 16, y: 26 };
         case 'bed': return { x: 20, y: 20 };

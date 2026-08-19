@@ -129,9 +129,13 @@ TWB.ACTIONS = {
     bush_berry: [
         { label: 'Pick berries', action: 'pick_berries' }
     ],
+    herb_vikos: [
+        { label: 'Pick herb', action: 'pick_vikosherb' }
+    ],
     campfire: [
         { label: 'Cook food', action: 'cook' },
         { label: 'Add wood', action: 'addwood' },
+        { label: 'Burn herb', action: 'burn_herb', needs: 'vikosherb' },
         { label: 'Rest', action: 'rest' }
     ],
     log_pile: [],
@@ -144,7 +148,8 @@ TWB.ACTIONS = {
     ],
     fireplace: [
         { label: 'Add wood', action: 'add_fp_wood' },
-        { label: 'Cook food', action: 'cook_fp' }
+        { label: 'Cook food', action: 'cook_fp' },
+        { label: 'Burn herb', action: 'burn_herb_fp', needs: 'vikosherb' }
     ],
     bed: [
         { label: 'Sleep', action: 'sleep' }
@@ -207,6 +212,7 @@ TWB.Game = function(canvas) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.ctx.imageSmoothingEnabled = false;
+    this.difficulty = 1;
 
     this.camera = new TWB.Camera(canvas.width, canvas.height);
     this.objects = TWB.generateObjects();
@@ -251,6 +257,15 @@ TWB.Game = function(canvas) {
     this.rainTimer = 3600 + Math.floor(Math.random() * 7200);
     this.rainDrops = [];
     this.rainDay = -1;
+    this.snowing = false;
+    this.snowTimer = 5400 + Math.floor(Math.random() * 10800);
+    this.snowFlakes = [];
+    this.snowAccum = {};
+    this.snowAccumRate = 0;
+
+    this.lastRestTime = -9999;
+    this.starvationTimer = 0;
+    this.wolfStarvationTimer = 0;
 
     this.wildlife = [];
     this.wildlifeTimer = 600 + Math.floor(Math.random() * 1200);
@@ -280,11 +295,73 @@ TWB.Game = function(canvas) {
     this.wolfSiegePack = [];
     this.windowShadowTimer = 0;
     this.shadowBreaching = false;
+    this.distortion = 0;
+    this.distortionFlicker = 0;
+
+    this.questPhase = 0;
+    this.questDay = -1;
+    this.questShrines = [];
+    this.questShrinesLit = 0;
+    this.questDogPos = null;
+    this.questTimer = 0;
+    this.questTimerMax = 48 * 3600;
+    this.questRevealed = false;
+    this.dogStolen = false;
+    this.dogRescued = false;
+    this.questSymbol = null;
 
     this.wetness = 0;
     this.windSpeed = 0;
     this.windTimer = 0;
     this.dogSense = null;
+
+    this.phantomLight = null;
+    this.phantomCooldown = 0;
+    this.phantom2 = null;
+    this.phantom2Cooldown = 0;
+
+    this.iconHover = -1;
+
+    var cursedCandidates = [];
+    for (var cci = 0; cci < TWB._cabinData.length; cci++) {
+        if (cci !== TWB._startCabin && cci !== TWB._targetCabin) cursedCandidates.push(cci);
+    }
+    this.cursedCabin = cursedCandidates[Math.floor(Math.random() * cursedCandidates.length)];
+    this.cursedDogStopped = false;
+
+    this.shadowDebt = 0;
+
+    this.shadowTrails = {};
+
+    this.mysteryEvent = null;
+    this.mysterySpawned = false;
+    this.mysteryChosen = Math.random() < 0.25 ? Math.floor(Math.random() * 50) : -1;
+
+    this.elder = null;
+    this.elderCooldown = 7200 + Math.floor(Math.random() * 14400);
+    this.elderDialogue = null;
+    this.elderPrompt = false;
+    this.elderTales = [
+        '"My grandmother used to say the Fates never appear to those who seek them. Only to those who are lost. If you ever see them standing still on the path, don\'t ask where you\'re going. They already know."',
+        '"Down in the valley, below the mountain, every winter they saw a light walking. Whoever followed it returned at dawn from the opposite side of the village. No one ever learned who carried the lantern."',
+        '"There was a cabin you could never find twice in the same place. Some said it moved. Others said it was the people who moved. Those who slept inside never agreed on where it had been."',
+        '"Listen to the dog. People see with their eyes. The dog sees with something else. If it stops and refuses to go forward, you\'d better go around."',
+        '"Never blow out a candle at a roadside shrine. Sometimes it was lit by the hand of the living, sometimes by the hand of the dead. You can never know which one it was."',
+        '"The river doesn\'t always take people. Sometimes it only takes their name. That\'s what the old ones said. The person would return, but not even their own dog would recognize them."',
+        '"The shadows aren\'t born at night. They wait there all day. The moment the sun sets, they rise."',
+        '"In my village there was a fir tree nobody would cut down. Not because they feared the tree. They feared the one who sat beneath it when no one was looking."',
+        '"Some nights you could hear a bell from a church that had crumbled before my father was born. Whoever followed the sound lost their way until dawn."',
+        '"If you ever reach a cabin and the dog stays outside... don\'t go in first."',
+        '"The Vikogiatroi knew something everyone else forgot. The herb with three leaves - you don\'t eat it. You throw it in the fire. The flame changes. The shadows don\'t dare come close."',
+        '"Don\'t cross a stone bridge after midnight. Not because you\'ll fall. Because something passes underneath at that hour, and if it senses you, it won\'t let you leave."'
+    ];
+    this.storyTruth = [];
+    for (var sti = 0; sti < this.elderTales.length; sti++) {
+        this.storyTruth.push(Math.random() < 0.5);
+    }
+    this.storyTruth[10] = true;
+    this.fireBuff = 0;
+    this.fireBuffFP = 0;
 
     this.foggy = false;
     this.fogTimer = 7200 + Math.floor(Math.random() * 10800);
@@ -348,10 +425,21 @@ TWB.Game.prototype.setupInput = function() {
             return;
         }
 
+        if (self.elderDialogue) return;
+
         if (self.menu) {
             self.menu.hovered = self.getMenuItemAt(sx, sy);
             return;
         }
+
+        var iconHit = self.getIconAt(sx, sy);
+        if (iconHit) {
+            self.iconHover = iconHit === 'TAB' ? 0 : iconHit === 'M' ? 1 : iconHit === 'C' ? 2 : 3;
+            self.canvas.style.cursor = 'pointer';
+            self.hoverObj = null;
+            return;
+        }
+        self.iconHover = -1;
 
         var w = self.camera.screenToWorld(sx, sy);
         var obj = self.findObjectAt(w.x, w.y);
@@ -370,10 +458,40 @@ TWB.Game.prototype.setupInput = function() {
     this.canvas.addEventListener('click', function(e) {
         if (self.windowView) { self.windowView = null; return; }
         if (self.readingNote) { self.readingNote = null; return; }
+        if (self.elderDialogue) { self.elderDialogue = null; return; }
         if (self.victory || self.dead) return;
         var rect = self.canvas.getBoundingClientRect();
         var sx = (e.clientX - rect.left) * (self.canvas.width / rect.width);
         var sy = (e.clientY - rect.top) * (self.canvas.height / rect.height);
+
+        var iconHit = self.getIconAt(sx, sy);
+        if (iconHit) {
+            if (iconHit === 'TAB') {
+                self.backpackOpen = !self.backpackOpen;
+                self.backpackHover = -1;
+                self.backpackBtnHover = null;
+                if (self.backpackOpen) { self.menu = null; self.craftingOpen = false; self.mapOpen = false; }
+            } else if (iconHit === 'M') {
+                if (!self.backpackOpen && !self.craftingOpen && !self.menu) self.mapOpen = !self.mapOpen;
+            } else if (iconHit === 'C') {
+                if (!self.backpackOpen && !self.menu) { self.craftingOpen = !self.craftingOpen; self.craftHover = -1; if (self.craftingOpen) self.mapOpen = false; }
+            } else if (iconHit === 'L') {
+                self.flashlightOn = !self.flashlightOn;
+                self.notification = { text: 'Flashlight ' + (self.flashlightOn ? 'ON' : 'OFF'), timer: 60 };
+            }
+            return;
+        }
+
+        if (self.mapOpen) {
+            var cw = self.canvas.width;
+            var mapXx = cw - 28, mapXy = 10, mapXs = 14;
+            if (sx >= mapXx && sx <= mapXx + mapXs && sy >= mapXy && sy <= mapXy + mapXs) {
+                self.mapOpen = false;
+                return;
+            }
+            self.mapOpen = false;
+            return;
+        }
 
         if (self.fates && self.fates.fade >= 1) {
             var fw = 340, fh = 220;
@@ -395,6 +513,10 @@ TWB.Game.prototype.setupInput = function() {
             }
             return;
         }
+
+        var closeHit = self.getPanelCloseAt(sx, sy);
+        if (closeHit === 'backpack') { self.backpackOpen = false; self.backpackHover = -1; return; }
+        if (closeHit === 'crafting') { self.craftingOpen = false; return; }
 
         if (self.craftingOpen) {
             var ci = self.getCraftItemAt(sx, sy);
@@ -583,6 +705,21 @@ TWB.Game.prototype.setupInput = function() {
             return;
         }
         if (self.victory || self.dead) return;
+        if (self.elderDialogue) {
+            if (e.key === 'e' || e.key === 'E' || e.key === 'Escape') {
+                self.elderDialogue = null;
+                return;
+            }
+        }
+        if ((e.key === 'e' || e.key === 'E') && self.elderPrompt && self.elder && !self.elderDialogue) {
+            self.elderDialogue = {
+                text: self.elderTales[self.elder.tale],
+                female: self.elder.female
+            };
+            self.elder = null;
+            self.elderPrompt = false;
+            return;
+        }
         if (e.key === 'Tab') {
             e.preventDefault();
             self.backpackOpen = !self.backpackOpen;
@@ -604,13 +741,203 @@ TWB.Game.prototype.setupInput = function() {
             if (self.backpackOpen || self.craftingOpen || self.menu) return;
             self.mapOpen = !self.mapOpen;
         }
-        if (e.key >= '0' && e.key <= '9') {
-            self.cheatBuffer = (self.cheatBuffer + e.key).slice(-6);
-            if (self.cheatBuffer === '123456') {
+        if (e.key.length === 1) {
+            self.cheatBuffer = (self.cheatBuffer + e.key.toLowerCase()).slice(-10);
+            var cb = self.cheatBuffer;
+            if (cb.slice(-6) === '123456') {
                 self.foggy = true;
                 self.fogTimer = 9999;
                 self.lastKnownMapPos = { x: self.player.x, y: self.player.y };
                 self.notification = { text: 'Dense fog rolls in...', timer: 120 };
+                self.cheatBuffer = '';
+            }
+            if (cb.slice(-5) === 'night') {
+                self.gameTime = 20 * 3600 + 30 * 60;
+                self.notification = { text: 'CHEAT: Night falls', timer: 120 };
+                self.cheatBuffer = '';
+            }
+            if (cb.slice(-3) === 'day') {
+                self.gameTime = 8 * 3600;
+                self.nightActive = false;
+                self.distortion = 0;
+                self.notification = { text: 'CHEAT: Dawn breaks', timer: 120 };
+                self.cheatBuffer = '';
+            }
+            if (cb.slice(-6) === 'starve') {
+                self.stats.hunger = 0;
+                self.stats.thirst = 0;
+                self.notification = { text: 'CHEAT: Starvation active', timer: 120 };
+                self.cheatBuffer = '';
+            }
+            if (cb.slice(-4) === 'feed') {
+                self.stats.hunger = 100;
+                self.stats.thirst = 100;
+                self.stats.health = 100;
+                self.starvationTimer = 0;
+                self.notification = { text: 'CHEAT: Fully fed & healed', timer: 120 };
+                self.cheatBuffer = '';
+            }
+            if (cb.slice(-4) === 'rest') {
+                self.lastRestTime = -9999;
+                self.notification = { text: 'CHEAT: Rest cooldown reset', timer: 120 };
+                self.cheatBuffer = '';
+            }
+            if (cb.slice(-6) === 'shadow') {
+                self.distortion = 1;
+                self.distortionFlicker = 1;
+                self.notification = { text: 'CHEAT: Max distortion', timer: 120 };
+                self.cheatBuffer = '';
+            }
+            if (cb.slice(-5) === 'quest') {
+                if (self.questPhase === 0 && !self.dogStolen && !self.dogRescued) {
+                    var shrineIndices = [];
+                    for (var qi = 0; qi < self.objects.length; qi++) {
+                        if (self.objects[qi].type === 'shrine') shrineIndices.push(qi);
+                    }
+                    self.questShrines = [];
+                    while (self.questShrines.length < 3 && shrineIndices.length > 0) {
+                        var ri = Math.floor(Math.random() * shrineIndices.length);
+                        self.questShrines.push(shrineIndices.splice(ri, 1)[0]);
+                    }
+                    var farCabin = 0, farDist = 0;
+                    for (var fi = 0; fi < TWB._cabinData.length; fi++) {
+                        var fc = TWB._cabinData[fi];
+                        var fdx = fc.cx * TWB.TILE - self.player.x;
+                        var fdy = fc.cy * TWB.TILE - self.player.y;
+                        var fd = fdx * fdx + fdy * fdy;
+                        if (fd > farDist) { farDist = fd; farCabin = fi; }
+                    }
+                    var fc2 = TWB._cabinData[farCabin];
+                    self.questDogPos = { x: fc2.cx * TWB.TILE + 40, y: fc2.cy * TWB.TILE + 40 };
+                    self.dogStolen = true;
+                    self.questPhase = 1;
+                    self.questDay = self.day;
+                    self.questTimer = 0;
+                    self.questTimerMax = 48 * 3600;
+                    self.questShrinesLit = 0;
+                    self.questRevealed = false;
+                    self.wolfX = -9999; self.wolfY = -9999;
+                    self.notification = { text: 'CHEAT: Dog stolen! Find 3 shrines', timer: 180 };
+                } else {
+                    self.notification = { text: 'Quest already active/done', timer: 120 };
+                }
+                self.cheatBuffer = '';
+            }
+            if (cb.slice(-6) === 'rescue') {
+                if (self.dogStolen && self.questDogPos) {
+                    self.player.x = self.questDogPos.x;
+                    self.player.y = self.questDogPos.y;
+                    self.questRevealed = true;
+                    self.questShrinesLit = 3;
+                    self.notification = { text: 'CHEAT: Teleported to dog', timer: 120 };
+                } else {
+                    self.notification = { text: 'No active quest', timer: 120 };
+                }
+                self.cheatBuffer = '';
+            }
+            if (cb.slice(-4) === 'easy') {
+                self.difficulty = 0;
+                self.notification = { text: 'CHEAT: Difficulty -> HIKERS', timer: 120 };
+                self.cheatBuffer = '';
+            }
+            if (cb.slice(-4) === 'hard') {
+                self.difficulty = 2;
+                self.notification = { text: 'CHEAT: Difficulty -> THE MISTS', timer: 120 };
+                self.cheatBuffer = '';
+            }
+            if (cb.slice(-6) === 'normal') {
+                self.difficulty = 1;
+                self.notification = { text: 'CHEAT: Difficulty -> MOUNTAINEERS', timer: 120 };
+                self.cheatBuffer = '';
+            }
+            if (cb.slice(-5) === 'ghost') {
+                var gAngle = Math.random() * Math.PI * 2;
+                var gDist = 250 + Math.random() * 100;
+                var gNear = -1;
+                var gX = self.player.x + Math.cos(gAngle) * gDist;
+                var gY = self.player.y + Math.sin(gAngle) * gDist;
+                for (var gi = 0; gi < TWB._cabinData.length; gi++) {
+                    var gc = TWB._cabinData[gi];
+                    var gdx = gc.cx * TWB.TILE - gX, gdy = gc.cy * TWB.TILE - gY;
+                    if (Math.sqrt(gdx * gdx + gdy * gdy) < 200) { gNear = gi; gX = gc.cx * TWB.TILE; gY = gc.cy * TWB.TILE; break; }
+                }
+                self.phantomLight = {
+                    x: gX, y: gY, brightness: 1, timer: 0, fadeStart: -1,
+                    outcome: gNear >= 0 ? (Math.random() < 0.5 ? 'cold_cabin' : 'just_left') : 'nothing',
+                    cabin: gNear, notified: false
+                };
+                self.notification = { text: 'CHEAT: Phantom light spawned', timer: 120 };
+                self.cheatBuffer = '';
+            }
+            if (cb.slice(-5) === 'torch') {
+                var tAngle = Math.random() * Math.PI * 2;
+                var tDist = 250 + Math.random() * 150;
+                self.phantom2 = {
+                    x: self.player.x + Math.cos(tAngle) * tDist,
+                    y: self.player.y + Math.sin(tAngle) * tDist,
+                    dir: Math.random() * Math.PI * 2,
+                    speed: 0.3 + Math.random() * 0.3,
+                    timer: 0, maxTime: 1800 + Math.floor(Math.random() * 3600),
+                    on: true, flickerTimer: 200,
+                    moveTimer: 0, movePhase: 'search',
+                    stareTimer: 0, stareTriggered: false
+                };
+                self.notification = { text: 'CHEAT: Phantom flashlight spawned', timer: 120 };
+                self.cheatBuffer = '';
+            }
+            if (cb.slice(-5) === 'curse') {
+                if (self.cursedCabin >= 0) {
+                    var ccab = TWB._cabinData[self.cursedCabin];
+                    self.player.x = ccab.cx * TWB.TILE;
+                    self.player.y = (ccab.cy + 4) * TWB.TILE;
+                    self.player.tx = self.player.x;
+                    self.player.ty = self.player.y;
+                    self.wolf.x = self.player.x + 30;
+                    self.wolf.y = self.player.y + 20;
+                    self.notification = { text: 'Teleported to cursed cabin', timer: 120 };
+                }
+                self.cheatBuffer = '';
+            }
+            if (cb.slice(-4) === 'debt') {
+                self.shadowDebt = Math.min(100, self.shadowDebt + 25);
+                self.notification = { text: 'Shadow Debt: ' + Math.floor(self.shadowDebt), timer: 120 };
+                self.cheatBuffer = '';
+            }
+            if (cb.slice(-7) === 'mystery') {
+                if (!self.mysterySpawned) {
+                    self.mysteryChosen = Math.floor(Math.random() * 50);
+                    self.mysteryEvent = {
+                        id: self.mysteryChosen,
+                        x: self.player.x + 100,
+                        y: self.player.y + 80,
+                        discovered: false
+                    };
+                    self.mysterySpawned = true;
+                    self.notification = { text: 'Mystery event spawned nearby', timer: 120 };
+                } else {
+                    self.notification = { text: 'Mystery already spawned this run', timer: 120 };
+                }
+                self.cheatBuffer = '';
+            }
+            if (cb.slice(-5) === 'elder') {
+                self.elder = {
+                    x: self.player.x + 60,
+                    y: self.player.y + 40,
+                    tale: Math.floor(Math.random() * self.elderTales.length),
+                    timer: 0,
+                    female: Math.random() < 0.5
+                };
+                self.notification = { text: 'Elder appeared nearby', timer: 120 };
+                self.cheatBuffer = '';
+            }
+            if (cb.slice(-4) === 'snow') {
+                self.snowing = !self.snowing;
+                self.snowTimer = self.snowing ? 5400 : 3600;
+                self.notification = { text: self.snowing ? 'Snow ON' : 'Snow OFF', timer: 120 };
+                self.cheatBuffer = '';
+            }
+            if (cb.slice(-5) === 'codes') {
+                self.notification = { text: 'night day starve feed rest shadow quest rescue easy hard normal ghost torch curse debt mystery elder snow', timer: 400 };
                 self.cheatBuffer = '';
             }
         }
@@ -623,6 +950,7 @@ TWB.Game.prototype.findObjectAt = function(wx, wy) {
     for (var i = 0; i < this.objects.length; i++) {
         var obj = this.objects[i];
         if (!TWB.ACTIONS[obj.type]) continue;
+        if (obj.type === 'herb_vikos' && obj.picked) continue;
         var dx = wx - obj.x;
         var dy = wy - obj.y;
         var d = Math.sqrt(dx * dx + dy * dy);
@@ -632,7 +960,7 @@ TWB.Game.prototype.findObjectAt = function(wx, wy) {
                    (obj.type === 'tree_pine') ? 36 :
                    (obj.type === 'river_spot') ? 40 :
                    (obj.type === 'trap') ? 20 :
-                   (obj.type === 'bush' || obj.type === 'bush_berry') ? 24 :
+                   (obj.type === 'bush' || obj.type === 'bush_berry' || obj.type === 'herb_vikos') ? 24 :
                    (obj.type === 'fireplace' || obj.type === 'cabinet' || obj.type === 'cabin_door') ? 28 :
                    (obj.type === 'bed') ? 32 :
                    (obj.type === 'table' || obj.type === 'shelf' || obj.type === 'crate') ? 28 :
@@ -674,6 +1002,7 @@ TWB.Game.prototype.openMenu = function(obj, sx, sy) {
     var resolved = [];
     for (var mi = 0; mi < items.length; mi++) {
         var it = items[mi];
+        if (it.needs && this.getItemCount(it.needs) <= 0) continue;
         if (it.action === 'open_stranger' && !this.stranger) continue;
         if (it.action === 'throw_meat' && !this.wolfSiege) continue;
         if (it.action === 'repair_cabin') {
@@ -752,7 +1081,13 @@ TWB.ITEM_LABELS = {
     trap: 'Trap', canteen: 'Canteen', canteen_full: 'Canteen (full)',
     rope: 'Rope', knife: 'Knife', torch: 'Torch', bandage: 'Bandage',
     fishing_rod: 'Fishing Rod', lighter: 'Lighter',
-    olive_oil: 'Olive Oil'
+    olive_oil: 'Olive Oil', vikosherb: '3-Leaf Herb'
+};
+
+TWB.ITEM_SHORT = {
+    vikosherb: 'Herb', canned_food: 'Canned', expired_food: 'Exp.Food',
+    fishing_rod: 'F.Rod', canteen_full: 'Water', olive_oil: 'Oil',
+    firewood: 'Fwood', lighter: 'Lightr', bandage: 'Bandge'
 };
 
 TWB.EDIBLE = { berries: true, food: true, canned_food: true };
@@ -799,7 +1134,8 @@ TWB.Game.prototype.getBackpackLayout = function() {
     var gap = 8;
     var totalW = cols * slotSize + (cols - 1) * gap;
     var pw = totalW + 40;
-    var ph = 50 + rows * (slotSize + gap) + 74;
+    var hasBtns = this.backpackHover >= 0 && this.backpack[this.backpackHover];
+    var ph = 50 + rows * (slotSize + gap) + (hasBtns ? 60 : 8);
     var px = Math.floor((this.canvas.width - pw) / 2);
     var py = Math.floor((this.canvas.height - ph) / 2) - 20;
     var slotsX = px + Math.floor((pw - totalW) / 2);
@@ -845,6 +1181,47 @@ TWB.Game.prototype.getBackpackBtnAt = function(sx, sy) {
         var bx = startX + col * (btnW + gapX);
         var by = baseY + row * (btnH + gapY);
         if (sx >= bx && sx <= bx + btnW && sy >= by && sy <= by + btnH) return btns[i];
+    }
+    return null;
+};
+
+TWB.Game.prototype.getIconAt = function(sx, sy) {
+    var iconSize = 22, iconGap = 4;
+    var boxW = 90;
+    var cx = this.canvas.width - boxW - 8;
+    var cy = 12;
+    var iconY = cy + 34;
+    var icons = [
+        { key: 'TAB', label: 'B' },
+        { key: 'M', label: 'M' },
+        { key: 'C', label: 'C' },
+        { key: 'L', label: 'L' }
+    ];
+    var totalIconW = icons.length * iconSize + (icons.length - 1) * iconGap;
+    var iconStartX = cx - 6 + boxW - totalIconW;
+    for (var i = 0; i < icons.length; i++) {
+        var ix = iconStartX + i * (iconSize + iconGap);
+        if (sx >= ix && sx <= ix + iconSize && sy >= iconY && sy <= iconY + iconSize) return icons[i].key;
+    }
+    return null;
+};
+
+TWB.Game.prototype.getPanelCloseAt = function(sx, sy) {
+    var xSize = 14;
+    if (this.backpackOpen) {
+        var l = this.getBackpackLayout();
+        var xx = l.px + l.pw - xSize - 6;
+        var xy = l.py + 6;
+        if (sx >= xx && sx <= xx + xSize && sy >= xy && sy <= xy + xSize) return 'backpack';
+    }
+    if (this.craftingOpen) {
+        var pw = 280;
+        var ph = 30 + TWB.RECIPES.length * 24 + 10;
+        var px = Math.floor((this.canvas.width - pw) / 2);
+        var py = Math.floor((this.canvas.height - ph) / 2) - 20;
+        var xx2 = px + pw - xSize - 6;
+        var xy2 = py + 4;
+        if (sx >= xx2 && sx <= xx2 + xSize && sy >= xy2 && sy <= xy2 + xSize) return 'crafting';
     }
     return null;
 };
@@ -908,6 +1285,31 @@ TWB.Game.prototype.executeAction = function(obj, action) {
                 msg = '+1 Berries (' + obj.berries + ' left)';
             }
             break;
+        case 'pick_vikosherb':
+            if (s.energy < 2) { msg = 'Too tired...'; break; }
+            if (obj.picked) { msg = 'Already picked'; break; }
+            if (!this.addToBackpack('vikosherb', 1)) { msg = 'Backpack is full!'; break; }
+            obj.picked = true;
+            s.energy = Math.max(0, s.energy - 2);
+            msg = '+1 3-Leaf Herb';
+            break;
+        case 'burn_herb':
+            var bhFuel = (obj.tempFuel !== undefined) ? obj.tempFuel : this.fireFuel;
+            if (bhFuel <= 0) { msg = 'Fire is out!'; break; }
+            if (this.getItemCount('vikosherb') <= 0) { msg = 'No herb to burn!'; break; }
+            this.removeFromBackpack('vikosherb', 1);
+            this.fireBuff = 18000;
+            msg = 'The flame turns green... shadows retreat';
+            this.notification = { text: msg, timer: 180 };
+            break;
+        case 'burn_herb_fp':
+            if (this.fireplaceFuel <= 0) { msg = 'Light the fireplace first!'; break; }
+            if (this.getItemCount('vikosherb') <= 0) { msg = 'No herb to burn!'; break; }
+            this.removeFromBackpack('vikosherb', 1);
+            this.fireBuffFP = 18000;
+            msg = 'The flame turns green... shadows retreat';
+            this.notification = { text: msg, timer: 180 };
+            break;
         case 'cook':
             var cookFuel = (obj.tempFuel !== undefined) ? obj.tempFuel : this.fireFuel;
             if (cookFuel <= 0) { msg = 'Fire is out!'; break; }
@@ -944,9 +1346,14 @@ TWB.Game.prototype.executeAction = function(obj, action) {
             }
             break;
         case 'rest':
+            if (this.gameTime - this.lastRestTime < 3600) {
+                msg = 'Too soon to rest again...';
+                break;
+            }
             s.energy = Math.min(100, s.energy + 30);
             s.health = Math.min(100, s.health + 10);
             this.wolfStats.energy = Math.min(100, this.wolfStats.energy + 20);
+            this.lastRestTime = this.gameTime;
             msg = 'Rested by the fire';
             break;
         case 'take':
@@ -996,24 +1403,32 @@ TWB.Game.prototype.executeAction = function(obj, action) {
             }
             break;
         case 'sleep':
-            s.energy = Math.min(100, s.energy + 60);
-            s.health = Math.min(100, s.health + 30);
-            s.hunger = Math.max(0, s.hunger - 20);
-            s.thirst = Math.max(0, s.thirst - 25);
-            this.wolfStats.energy = Math.min(100, this.wolfStats.energy + 40);
-            this.wolfStats.hunger = Math.max(0, this.wolfStats.hunger - 15);
-            this.wolfStats.thirst = Math.max(0, this.wolfStats.thirst - 20);
-            this.wolfStats.mood = 'Loyal';
-            this.gameTime += 8 * 3600;
-            this.fireFuel = Math.max(0, this.fireFuel - 30);
-            this.fireplaceFuel = Math.max(0, this.fireplaceFuel - 30);
-            msg = 'Slept 8 hours...';
+            if (this.currentCabinIdx === this.cursedCabin) {
+                this.gameTime += 1 * 3600;
+                s.hunger = Math.max(0, s.hunger - 5);
+                s.thirst = Math.max(0, s.thirst - 5);
+                msg = 'You woke after an hour... couldn\'t sleep.';
+            } else {
+                s.energy = Math.min(100, s.energy + 60);
+                s.health = Math.min(100, s.health + 30);
+                s.hunger = Math.max(0, s.hunger - 20);
+                s.thirst = Math.max(0, s.thirst - 25);
+                this.wolfStats.energy = Math.min(100, this.wolfStats.energy + 40);
+                this.wolfStats.hunger = Math.max(0, this.wolfStats.hunger - 15);
+                this.wolfStats.thirst = Math.max(0, this.wolfStats.thirst - 20);
+                this.wolfStats.mood = 'Loyal';
+                this.gameTime += 8 * 3600;
+                this.fireFuel = Math.max(0, this.fireFuel - 30);
+                this.fireplaceFuel = Math.max(0, this.fireplaceFuel - 30);
+                msg = 'Slept 8 hours...';
+            }
             break;
         case 'search_cabinet':
             var searchKey = this.currentCabinIdx;
             var searchCount = this.cabinSearches[searchKey] || 0;
             var cabinType = TWB.CABIN_TYPES[TWB._cabinData[searchKey].type];
-            if (searchCount >= cabinType.maxSearch) { msg = 'Nothing left to find'; break; }
+            var searchLimit = this.difficulty === 0 ? cabinType.maxSearch + 2 : this.difficulty === 2 ? Math.max(1, cabinType.maxSearch - 1) : cabinType.maxSearch;
+            if (searchCount >= searchLimit) { msg = 'Nothing left to find'; break; }
             this.cabinSearches[searchKey] = searchCount + 1;
             s.energy = Math.max(0, s.energy - 3);
             if (!this.lighterFound) {
@@ -1400,6 +1815,7 @@ TWB.Game.prototype.update = function() {
     if (this.victory) { this.victoryTimer++; return; }
     if (this.dead) { this.deathTimer++; return; }
     if (this.fates && this.fates.fade >= 1) return;
+    if (this.elderDialogue) return;
     if (this.stats.health <= 0 && !this.dead) {
         this.dead = true;
         this.deathTimer = 0;
@@ -1438,7 +1854,10 @@ TWB.Game.prototype.update = function() {
         }
     }
 
-    if (this.wolfHunting) {
+    if (this.dogStolen) {
+        this.wolfHunting = null;
+        this.dogSense = null;
+    } else if (this.wolfHunting) {
         var prey = this.wolfHunting;
         var hdx = prey.x - this.wolf.x;
         var hdy = prey.y - this.wolf.y;
@@ -1581,12 +2000,16 @@ TWB.Game.prototype.update = function() {
     this.fireTime++;
     this.gameTime++;
 
+    if (this.fireBuff > 0) this.fireBuff--;
+    if (this.fireBuffFP > 0) this.fireBuffFP--;
     if (this.fireFuel > 0) {
-        this.fireFuel = Math.max(0, this.fireFuel - 0.005);
+        this.fireFuel = Math.max(0, this.fireFuel - (this.fireBuff > 0 ? 0.002 : 0.005));
     }
     var fpBurn = 0.005;
     if (this.nightType === 'freeze' && this.nightActive) fpBurn = 0.01;
     if (this.indoors && this.currentCabinIdx >= 0 && TWB._cabinData[this.currentCabinIdx].damaged && !TWB._cabinData[this.currentCabinIdx].repaired) fpBurn *= 1.5;
+    if (this.indoors && this.currentCabinIdx === this.cursedCabin) fpBurn *= 2;
+    if (this.fireBuffFP > 0) fpBurn *= 0.4;
     if (this.fireplaceFuel > 0) {
         this.fireplaceFuel = Math.max(0, this.fireplaceFuel - fpBurn);
     }
@@ -1608,13 +2031,22 @@ TWB.Game.prototype.update = function() {
         }
     }
 
+    if ((this.fireBuffFP > 0 && this.indoors) || this.fireBuff > 0) {
+        if (this.wolfStats.health < 100) {
+            this.wolfStats.health = Math.min(100, this.wolfStats.health + 0.003);
+        }
+    }
+
     if (this.gameTime % 600 === 0) {
-        this.stats.energy = Math.max(0, this.stats.energy - 1);
-        this.wolfStats.energy = Math.max(0, this.wolfStats.energy - 0.5);
-        this.stats.hunger = Math.max(0, this.stats.hunger - 0.8);
-        this.wolfStats.hunger = Math.max(0, this.wolfStats.hunger - 0.6);
-        this.stats.thirst = Math.max(0, this.stats.thirst - 1.0);
-        this.wolfStats.thirst = Math.max(0, this.wolfStats.thirst - 0.7);
+        var drainMult = this.difficulty === 0 ? 0.7 : this.difficulty === 2 ? 1.4 : 1;
+        this.stats.energy = Math.max(0, this.stats.energy - 1 * drainMult);
+        this.stats.hunger = Math.max(0, this.stats.hunger - 0.8 * drainMult);
+        this.stats.thirst = Math.max(0, this.stats.thirst - 1.0 * drainMult);
+        if (!this.dogStolen) {
+            this.wolfStats.energy = Math.max(0, this.wolfStats.energy - 0.5 * drainMult);
+            this.wolfStats.hunger = Math.max(0, this.wolfStats.hunger - 0.6 * drainMult);
+            this.wolfStats.thirst = Math.max(0, this.wolfStats.thirst - 0.7 * drainMult);
+        }
     }
     if (this.player.moving && this.gameTime % 300 === 0) {
         this.stats.energy = Math.max(0, this.stats.energy - 0.5);
@@ -1680,7 +2112,8 @@ TWB.Game.prototype.update = function() {
 
     var nightHour = this.getGameHour();
     var wasNight = this.nightActive;
-    this.nightActive = nightHour >= 20 || nightHour < 6;
+    var nightStart = this.difficulty === 0 ? 21 : this.difficulty === 2 ? 19 : 20;
+    this.nightActive = nightHour >= nightStart || nightHour < 6;
 
     var gameDay = Math.floor(this.gameTime / 86400);
     if (this.nightActive && !wasNight) {
@@ -1705,8 +2138,14 @@ TWB.Game.prototype.update = function() {
 
     var isSurge = this.nightType === 'shadow_surge';
     var isFreeze = this.nightType === 'freeze';
-    var maxShadows = isSurge ? 8 : 6;
-    var shadowSpawnRate = isSurge ? 150 : 300;
+    var baseShadows = this.difficulty === 0 ? 4 : this.difficulty === 2 ? 8 : 6;
+    if (this.shadowDebt >= 40) baseShadows += 2;
+    if (this.shadowDebt >= 80) baseShadows += 2;
+    var maxShadows = isSurge ? baseShadows + 2 : baseShadows;
+    var baseSpawnRate = this.difficulty === 0 ? 450 : this.difficulty === 2 ? 200 : 300;
+    if (this.shadowDebt >= 20) baseSpawnRate = Math.floor(baseSpawnRate * 0.8);
+    if (this.shadowDebt >= 60) baseSpawnRate = Math.floor(baseSpawnRate * 0.6);
+    var shadowSpawnRate = isSurge ? Math.floor(baseSpawnRate * 0.5) : baseSpawnRate;
 
     if (this.nightActive && !this.indoors) {
         this.shadowSpawnTimer++;
@@ -1742,8 +2181,22 @@ TWB.Game.prototype.update = function() {
                 var toShadow = Math.atan2(-sdy, -sdx);
                 var angleDiff = Math.abs(toShadow - fAngle);
                 if (angleDiff > Math.PI) angleDiff = Math.PI * 2 - angleDiff;
-                if (angleDiff < 0.8 && sdist < 150) {
-                    sh.retreatTimer = 120;
+                var flashRange = this.shadowDebt >= 80 ? 90 : 150;
+                var flashRetreat = this.shadowDebt >= 80 ? 60 : 120;
+                if (angleDiff < 0.8 && sdist < flashRange) {
+                    sh.retreatTimer = flashRetreat;
+                }
+            }
+
+            if (this.fireBuff > 0) {
+                for (var cfi = 0; cfi < this.objects.length; cfi++) {
+                    var cf = this.objects[cfi];
+                    if (cf.type === 'campfire' && cf.tempFuel > 0) {
+                        var cfdx = sh.x - cf.x, cfdy = sh.y - cf.y;
+                        if (Math.sqrt(cfdx * cfdx + cfdy * cfdy) < 200) {
+                            sh.retreatTimer = 60;
+                        }
+                    }
                 }
             }
 
@@ -1788,7 +2241,7 @@ TWB.Game.prototype.update = function() {
         if (this.cabinEventTimer > eventInterval + Math.floor(Math.random() * 600)) {
             this.cabinEventTimer = 0;
             var evRoll = Math.random();
-            if (isSurge && this.fireplaceFuel <= 0 && !this.shadowBreaching) {
+            if (isSurge && this.fireplaceFuel <= 0 && !this.shadowBreaching && this.fireBuffFP <= 0) {
                 this.shadowBreaching = true;
                 this.doorShake = 120;
                 this.wolfStats.mood = 'Terrified';
@@ -1817,6 +2270,18 @@ TWB.Game.prototype.update = function() {
                 this.wolfStats.health = Math.max(0, this.wolfStats.health - 0.01);
             }
         }
+
+        if (this.shadowBreaching || this.doorShake > 0) {
+            this.distortion = Math.min(1, this.distortion + 0.003);
+        } else if (this.cabinEventTimer < 100) {
+            this.distortion = Math.min(0.6, this.distortion + 0.001);
+        } else {
+            this.distortion = Math.max(0, this.distortion - 0.002);
+        }
+        if (this.distortion > 0.2 && Math.random() < 0.01) {
+            this.distortionFlicker = 8 + Math.floor(Math.random() * 12);
+        }
+        if (this.distortionFlicker > 0) this.distortionFlicker--;
 
         if (this.fireplaceFuel <= 0 && nightHour >= 21) {
             this.stats.health = Math.max(0, this.stats.health - 0.01);
@@ -1868,6 +2333,171 @@ TWB.Game.prototype.update = function() {
         }
     }
 
+    if (!this.nightActive || !this.indoors) {
+        this.distortion = Math.max(0, this.distortion - 0.005);
+        this.distortionFlicker = 0;
+    }
+
+    if (this.phantomCooldown > 0) this.phantomCooldown--;
+    if (this.nightActive && !this.indoors && !this.phantomLight && this.phantomCooldown <= 0) {
+        var plHour = this.getGameHour();
+        if (plHour >= 22 || plHour < 4) {
+            var plCond = this.foggy || this.raining || this.windSpeed > 1.5;
+            if (plCond && Math.random() < 0.0004) {
+                var plAngle = Math.random() * Math.PI * 2;
+                var plDist = 280 + Math.random() * 160;
+                var plX = this.player.x + Math.cos(plAngle) * plDist;
+                var plY = this.player.y + Math.sin(plAngle) * plDist;
+                var plType = Math.random();
+                var plNearCabin = -1;
+                for (var pci = 0; pci < TWB._cabinData.length; pci++) {
+                    var pcab = TWB._cabinData[pci];
+                    var pcdx = pcab.cx * TWB.TILE - plX;
+                    var pcdy = pcab.cy * TWB.TILE - plY;
+                    if (Math.sqrt(pcdx * pcdx + pcdy * pcdy) < 200) {
+                        plNearCabin = pci;
+                        plX = pcab.cx * TWB.TILE;
+                        plY = pcab.cy * TWB.TILE;
+                        break;
+                    }
+                }
+                var plOutcome = plNearCabin >= 0 ? (plType < 0.4 ? 'cold_cabin' : 'just_left') : 'nothing';
+                this.phantomLight = {
+                    x: plX, y: plY,
+                    brightness: 1,
+                    timer: 0,
+                    fadeStart: -1,
+                    outcome: plOutcome,
+                    cabin: plNearCabin,
+                    notified: false
+                };
+            }
+        }
+    }
+    if (this.phantomLight) {
+        var pl = this.phantomLight;
+        pl.timer++;
+        var pdx = this.player.x - pl.x;
+        var pdy = this.player.y - pl.y;
+        var pDist = Math.sqrt(pdx * pdx + pdy * pdy);
+        if (pDist < 160 && pl.fadeStart < 0) {
+            pl.fadeStart = pl.timer;
+        }
+        if (pl.fadeStart >= 0) {
+            var fadeElapsed = pl.timer - pl.fadeStart;
+            pl.brightness = Math.max(0, 1 - fadeElapsed * 0.008);
+        }
+        if (pl.brightness <= 0) {
+            if (!pl.notified) {
+                pl.notified = true;
+                if (pl.outcome === 'cold_cabin') {
+                    this.notification = { text: 'The cabin is dark. The fireplace is cold... old ash.', timer: 200 };
+                } else if (pl.outcome === 'just_left') {
+                    this.notification = { text: 'The door is ajar... the fireplace still warm. Someone was just here.', timer: 240 };
+                } else {
+                    this.notification = { text: 'Nothing here. You could have sworn you saw light...', timer: 200 };
+                }
+            }
+            if (pl.timer - pl.fadeStart > 180) {
+                this.phantomLight = null;
+                this.phantomCooldown = 5400 + Math.floor(Math.random() * 7200);
+            }
+        }
+        if (pl.timer > 3600) {
+            this.phantomLight = null;
+            this.phantomCooldown = 3600;
+        }
+    }
+    if (!this.nightActive && this.phantomLight) {
+        this.phantomLight = null;
+    }
+
+    if (this.phantom2Cooldown > 0) this.phantom2Cooldown--;
+    if (this.nightActive && !this.indoors && !this.phantom2 && this.phantom2Cooldown <= 0) {
+        var p2Hour = this.getGameHour();
+        if (p2Hour >= 21 || p2Hour < 4) {
+            if (Math.random() < 0.0003) {
+                var p2Angle = Math.random() * Math.PI * 2;
+                var p2Dist = 300 + Math.random() * 200;
+                var p2X = this.player.x + Math.cos(p2Angle) * p2Dist;
+                var p2Y = this.player.y + Math.sin(p2Angle) * p2Dist;
+                var p2Dur = 900 + Math.floor(Math.random() * 5400);
+                this.phantom2 = {
+                    x: p2X, y: p2Y,
+                    dir: Math.random() * Math.PI * 2,
+                    speed: 0.3 + Math.random() * 0.3,
+                    timer: 0,
+                    maxTime: p2Dur,
+                    on: true,
+                    flickerTimer: 120 + Math.floor(Math.random() * 300),
+                    moveTimer: 0,
+                    movePhase: 'search',
+                    stareTimer: 0,
+                    stareTriggered: false
+                };
+            }
+        }
+    }
+    if (this.phantom2) {
+        var p2 = this.phantom2;
+        p2.timer++;
+        p2.moveTimer++;
+        p2.flickerTimer--;
+
+        if (p2.flickerTimer <= 0) {
+            p2.on = !p2.on;
+            p2.flickerTimer = p2.on ? (60 + Math.floor(Math.random() * 240)) : (30 + Math.floor(Math.random() * 90));
+        }
+
+        if (p2.stareTimer > 0) {
+            p2.stareTimer--;
+            var sDx = this.player.x - p2.x;
+            var sDy = this.player.y - p2.y;
+            p2.dir = Math.atan2(sDy, sDx);
+            if (p2.stareTimer <= 0) {
+                p2.dir = Math.random() * Math.PI * 2;
+            }
+        } else if (p2.movePhase === 'search') {
+            p2.dir += (Math.random() - 0.5) * 0.05;
+            p2.x += Math.cos(p2.dir) * p2.speed;
+            p2.y += Math.sin(p2.dir) * p2.speed;
+            if (p2.moveTimer > 180 + Math.floor(Math.random() * 300)) {
+                p2.movePhase = 'pause';
+                p2.moveTimer = 0;
+            }
+        } else if (p2.movePhase === 'pause') {
+            p2.dir += (Math.random() - 0.5) * 0.08;
+            if (p2.moveTimer > 60 + Math.floor(Math.random() * 120)) {
+                p2.movePhase = 'search';
+                p2.moveTimer = 0;
+                if (!p2.stareTriggered && Math.random() < 0.25) {
+                    p2.stareTimer = 300;
+                    p2.stareTriggered = true;
+                    p2.on = true;
+                }
+            }
+        }
+
+        var p2dx = this.player.x - p2.x;
+        var p2dy = this.player.y - p2.y;
+        var p2d = Math.sqrt(p2dx * p2dx + p2dy * p2dy);
+        if (p2d < 200) {
+            p2.x -= (p2dx / p2d) * 0.6;
+            p2.y -= (p2dy / p2d) * 0.6;
+        }
+
+        if (p2.timer >= p2.maxTime) {
+            p2.on = false;
+            if (p2.timer > p2.maxTime + 60) {
+                this.phantom2 = null;
+                this.phantom2Cooldown = 7200 + Math.floor(Math.random() * 10800);
+            }
+        }
+    }
+    if (!this.nightActive && this.phantom2) {
+        this.phantom2 = null;
+    }
+
     if (!this.nightActive) {
         this.barricaded = false;
         this.cabinEventTimer = 0;
@@ -1879,6 +2509,88 @@ TWB.Game.prototype.update = function() {
             this.wolfSiegePack = [];
             this.notification = { text: 'Dawn breaks. The wolves retreat.', timer: 150 };
         }
+        if (wasNight && !this.dogStolen && !this.dogRescued && this.questPhase === 0) {
+            var triggerDay = this.difficulty === 0 ? -1 : this.difficulty === 2 ? 2 : 3;
+            if (triggerDay > 0 && gameDay >= triggerDay) {
+                this.questPhase = 1;
+                this.dogStolen = true;
+                this.questDay = gameDay;
+                this.questTimer = 0;
+                this.wolfHunting = null;
+                this.dogSense = null;
+                var shrines = [];
+                for (var qsi = 0; qsi < this.objects.length; qsi++) {
+                    if (this.objects[qsi].type === 'shrine') shrines.push(qsi);
+                }
+                this.questShrines = [];
+                var shuffled = shrines.slice();
+                for (var qi = shuffled.length - 1; qi > 0; qi--) {
+                    var qj = Math.floor(Math.random() * (qi + 1));
+                    var tmp = shuffled[qi]; shuffled[qi] = shuffled[qj]; shuffled[qj] = tmp;
+                }
+                this.questShrines = shuffled.slice(0, 3);
+                this.questShrinesLit = 0;
+                var farCabin = 0, farDist = 0;
+                for (var fci = 0; fci < TWB._cabinData.length; fci++) {
+                    var fc = TWB._cabinData[fci];
+                    var fdx = fc.cx * TWB.TILE - this.player.x;
+                    var fdy = fc.cy * TWB.TILE - this.player.y;
+                    var fd = Math.sqrt(fdx * fdx + fdy * fdy);
+                    if (fd > farDist) { farDist = fd; farCabin = fci; }
+                }
+                var fcc = TWB._cabinData[farCabin];
+                var qOffX = (Math.random() - 0.5) * 200;
+                var qOffY = (Math.random() - 0.5) * 200;
+                this.questDogPos = { x: fcc.cx * TWB.TILE + qOffX, y: fcc.cy * TWB.TILE + qOffY };
+                this.questSymbol = { x: this.wolf.x, y: this.wolf.y };
+                this.wolf.x = -9999;
+                this.wolf.y = -9999;
+                this.notification = { text: 'You wake to silence... ' + (this.dogName || 'the dog') + ' is gone. A dark symbol marks where he slept.', timer: 300 };
+            }
+        }
+    }
+
+    if (this.dogStolen && this.questPhase > 0) {
+        this.questTimer++;
+        if (this.questPhase === 1) {
+            var litCount = 0;
+            for (var qci = 0; qci < this.questShrines.length; qci++) {
+                var qs = this.objects[this.questShrines[qci]];
+                if (qs && qs.lit) litCount++;
+            }
+            if (litCount > this.questShrinesLit) {
+                this.questShrinesLit = litCount;
+                this._mapCanvas = null;
+                if (litCount < 3) {
+                    this.notification = { text: 'Shrine ' + litCount + '/3 lit. The mountain hums...', timer: 180 };
+                }
+            }
+            if (litCount >= 3 && !this.questRevealed) {
+                this.questRevealed = true;
+                this.questPhase = 2;
+                this._mapCanvas = null;
+                this.notification = { text: 'A divine light reveals ' + (this.dogName || 'the dog') + '\'s location! Find him before it\'s too late!', timer: 300 };
+            }
+        }
+        if (this.questPhase === 2 && !this.indoors) {
+            var qdx = this.player.x - this.questDogPos.x;
+            var qdy = this.player.y - this.questDogPos.y;
+            if (Math.sqrt(qdx * qdx + qdy * qdy) < 50) {
+                this.dogStolen = false;
+                this.dogRescued = true;
+                this.questPhase = 3;
+                this.wolf.x = this.questDogPos.x;
+                this.wolf.y = this.questDogPos.y;
+                this.wolfStats.health = Math.max(30, this.wolfStats.health);
+                this.wolfStats.mood = 'Happy';
+                this._mapCanvas = null;
+                this.notification = { text: (this.dogName || 'Dog') + ' leaps into your arms! He\'s weak but alive!', timer: 300 };
+            }
+        }
+        if (this.questTimer >= this.questTimerMax && this.questPhase < 3) {
+            this.questPhase = -1;
+            this.notification = { text: (this.dogName || 'The dog') + ' is lost forever to the mountain\'s darkness...', timer: 400 };
+        }
     }
 
     if (this.gameTime % 300 === 0) {
@@ -1889,10 +2601,18 @@ TWB.Game.prototype.update = function() {
         }
     }
     if (this.stats.hunger <= 0 || this.stats.thirst <= 0) {
-        this.stats.health = Math.max(0, this.stats.health - 0.02);
+        this.starvationTimer++;
+        var starvMult = 1 + Math.floor(this.starvationTimer / 1800) * 0.5;
+        this.stats.health = Math.max(0, this.stats.health - 0.02 * starvMult);
+    } else {
+        this.starvationTimer = 0;
     }
     if (this.wolfStats.hunger <= 0 || this.wolfStats.thirst <= 0) {
-        this.wolfStats.health = Math.max(0, this.wolfStats.health - 0.015);
+        this.wolfStarvationTimer++;
+        var wStarvMult = 1 + Math.floor(this.wolfStarvationTimer / 1800) * 0.5;
+        this.wolfStats.health = Math.max(0, this.wolfStats.health - 0.015 * wStarvMult);
+    } else {
+        this.wolfStarvationTimer = 0;
     }
     if (this.gameTime % 600 === 0) {
         for (var bi = 0; bi < this.backpack.length; bi++) {
@@ -1962,7 +2682,9 @@ TWB.Game.prototype.update = function() {
 
         this.wildlifeTimer--;
         if (this.wildlifeTimer <= 0 && this.wildlife.length < 3 && !this.predator) {
-            this.wildlifeTimer = 900 + Math.floor(Math.random() * 1800);
+            var wlBase = this.difficulty === 0 ? 800 : this.difficulty === 2 ? 2400 : 1500;
+            var wlRand = this.difficulty === 0 ? 1600 : this.difficulty === 2 ? 4800 : 3000;
+            this.wildlifeTimer = wlBase + Math.floor(Math.random() * wlRand);
             var hour = this.getGameHour();
             if (hour >= 6 && hour < 20) {
                 var spAngle = Math.random() * Math.PI * 2;
@@ -2056,11 +2778,218 @@ TWB.Game.prototype.update = function() {
         this.wolfStats.health = Math.max(0, this.wolfStats.health - 0.6);
     }
 
+    this.snowTimer--;
+    if (this.snowTimer <= 0) {
+        if (this.snowing) {
+            this.snowing = false;
+            this.snowTimer = 7200 + Math.floor(Math.random() * 14400);
+            this.notification = { text: 'The snow stopped.', timer: 120 };
+        } else if (!this.raining) {
+            var sHour = this.getGameHour();
+            if (sHour >= 0 && sHour < 6 || sHour >= 16) {
+                this.snowing = true;
+                this.snowTimer = 2700 + Math.floor(Math.random() * 7200);
+                this.notification = { text: 'It started snowing...', timer: 120 };
+            } else {
+                this.snowTimer = 1800;
+            }
+        } else {
+            this.snowTimer = 1800;
+        }
+    }
+
+    if (this.snowing && !this.indoors) {
+        this.snowAccumRate = Math.min(1, this.snowAccumRate + 0.001);
+        if (this.gameTime % 10 === 0) {
+            var ptx = Math.floor(this.player.x / TWB.TILE);
+            var pty = Math.floor(this.player.y / TWB.TILE);
+            for (var asy = pty - 14; asy <= pty + 14; asy++) {
+                for (var asx = ptx - 20; asx <= ptx + 20; asx++) {
+                    if (asx < 0 || asy < 0 || asx >= TWB.COLS || asy >= TWB.ROWS) continue;
+                    var gt = TWB.getGround(asx, asy);
+                    if (gt === TWB.T_WATER || gt === TWB.T_WATER_DEEP) continue;
+                    var sKey = asx + ',' + asy;
+                    var cur = this.snowAccum[sKey] || 0;
+                    if (cur < 1) {
+                        this.snowAccum[sKey] = Math.min(1, cur + 0.03 + Math.random() * 0.04);
+                    }
+                }
+            }
+        }
+    } else if (!this.snowing) {
+        this.snowAccumRate = Math.max(0, this.snowAccumRate - 0.0001);
+    }
+
     if (this.notification) {
         this.notification.timer--;
         if (this.notification.timer <= 0) this.notification = null;
     }
 
+    // --- CURSED CABIN ---
+    if (this.cursedCabin >= 0 && !this.indoors) {
+        var cc = TWB._cabinData[this.cursedCabin];
+        var ccx = cc.cx * TWB.TILE, ccy = cc.cy * TWB.TILE;
+        var ccdx = this.player.x - ccx, ccdy = this.player.y - ccy;
+        var ccDist = Math.sqrt(ccdx * ccdx + ccdy * ccdy);
+        if (ccDist < 140 && !this.cursedDogStopped && !this.dogStolen) {
+            this.cursedDogStopped = true;
+            this.wolf.tx = this.wolf.x;
+            this.wolf.ty = this.wolf.y;
+            this.wolf.moving = false;
+            this.wolfStats.mood = 'Uneasy';
+        }
+        if (ccDist > 200) this.cursedDogStopped = false;
+    }
+    if (this.indoors && this.currentCabinIdx === this.cursedCabin) {
+        if (this.fireplaceFuel > 0 && this.gameTime % 1800 === 0 && Math.random() < 0.3) {
+            this.fireplaceFuel = 0;
+            if (!this.notification) this.notification = { text: 'The fire went out...', timer: 120 };
+        }
+        if (this.cursedDogStopped || true) {
+            this.wolf.x = 6 * 32;
+            this.wolf.y = 8 * 32;
+            this.wolf.tx = this.wolf.x;
+            this.wolf.ty = this.wolf.y;
+            this.wolf.moving = false;
+        }
+    }
+
+    // --- NIGHT DEBT ---
+    var hour = this.getGameHour();
+    if (!this.indoors && hour >= 21) {
+        var debtRate = hour >= 23 ? 0.008 : hour >= 22 ? 0.005 : 0.003;
+        this.shadowDebt = Math.min(100, this.shadowDebt + debtRate);
+    } else if (this.indoors) {
+        this.shadowDebt = Math.max(0, this.shadowDebt - 0.001);
+    }
+    if (this.shadowDebt >= 10 && !this.dogStolen && this.gameTime % 600 === 0) {
+        this.wolfStats.mood = 'Uneasy';
+    }
+    if (this.shadowDebt >= 60 && !this.indoors && this.gameTime % 300 === 0) {
+        this.stats.health = Math.max(0, this.stats.health - 0.3);
+    }
+
+    // --- SHADOW TRAIL ---
+    for (var sti = 0; sti < this.shadows.length; sti++) {
+        var stsh = this.shadows[sti];
+        var stKey = Math.floor(stsh.x / TWB.TILE) + ',' + Math.floor(stsh.y / TWB.TILE);
+        if (!this.shadowTrails[stKey]) this.shadowTrails[stKey] = 0;
+        this.shadowTrails[stKey] = Math.min(5, this.shadowTrails[stKey] + 0.002);
+    }
+    if (!this.indoors) {
+        var ptKey = Math.floor(this.player.x / TWB.TILE) + ',' + Math.floor(this.player.y / TWB.TILE);
+        if (this.shadowTrails[ptKey] && this.shadowTrails[ptKey] > 1) {
+            if (this.gameTime % 120 === 0) {
+                this.stats.health = Math.max(0, this.stats.health - 0.2 * Math.floor(this.shadowTrails[ptKey]));
+            }
+        }
+    }
+
+    // --- MYSTERY EVENT ---
+    if (this.mysteryChosen >= 0 && !this.mysterySpawned && !this.indoors) {
+        var mHour = this.getGameHour();
+        if (mHour >= 10 && mHour < 20 && Math.random() < 0.0001) {
+            var mx = this.player.x + (Math.random() - 0.5) * 500;
+            var my = this.player.y + (Math.random() - 0.5) * 500;
+            mx = Math.max(100, Math.min(TWB.COLS * TWB.TILE - 100, mx));
+            my = Math.max(100, Math.min(TWB.ROWS * TWB.TILE - 100, my));
+            this.mysteryEvent = { id: this.mysteryChosen, x: mx, y: my, discovered: false };
+            this.mysterySpawned = true;
+        }
+    }
+    if (this.mysteryEvent && !this.mysteryEvent.discovered) {
+        var meDx = this.player.x - this.mysteryEvent.x;
+        var meDy = this.player.y - this.mysteryEvent.y;
+        if (Math.sqrt(meDx * meDx + meDy * meDy) < 80) {
+            this.mysteryEvent.discovered = true;
+            var mysteryTexts = [
+                'A campfire burns alone... as you approach, it dies.',
+                'Ten candles in a perfect circle. No one around.',
+                'All trees here lie fallen. Same direction.',
+                'A table with a warm plate. No one in sight.',
+                'A cauldron of boiling water. No one tends it.',
+                'A shrine covered in fresh flowers. Who left them?',
+                'Fifty shoes lined up in a row.',
+                'Ten chairs. All facing the same point in the distance.',
+                'A single burned tree among green ones.',
+                'A swing moves by itself. No wind.',
+                'An old bicycle against a tree.',
+                'An empty suitcase. Nothing else.',
+                'An open book. The pages don\'t turn.',
+                'Dozens of spoons scattered on the ground.',
+                'A well. You hear water. No bucket.',
+                'A small wooden boat. In the middle of the forest.',
+                'A large wall clock on a tree. Frozen at 3:33.',
+                'Every stone here has a cross carved into it.',
+                'A massive tree wrapped in hundreds of ribbons.',
+                'A table with a chess game. Mid-play. No players.',
+                'A single child\'s shoe. Nothing else.',
+                'Two overturned boats. Miles from water.',
+                'A backpack. Bone dry inside. In pouring rain.',
+                'A tree with dozens of nails hammered in.',
+                'All mushrooms here are black.',
+                'A hundred stones in a perfect straight line.',
+                'A wooden door. Standing alone. No building.',
+                'Three empty swings. Perfectly still.',
+                'A huge pile of firewood. As if someone was preparing.',
+                'A cabin. All chairs placed outside.',
+                'A cabin. Every window open. Door locked.',
+                'A cabin. Table set for dinner. No one here.',
+                'A path that ends abruptly. Into nothing.',
+                'A clearing. Not a single tree. In a dense forest.',
+                'A stone with a lit candle on top.',
+                'Three shrines, side by side.',
+                'A tree surrounded by dozens of empty cages.',
+                'A line of stone cairns. Too many. Like a road.',
+                'A wolf den. Empty. Filled with flowers.',
+                'A wooden table. A lit lantern. It never goes out.',
+                'A cabin. Door open. Fire burning. No one inside.',
+                'A felled tree. Cut too perfectly. Like a machine.',
+                'A perfect circle of mushrooms.',
+                'Dozens of empty oil bottles around a shrine.',
+                'Trees with the same number carved into every trunk.',
+                'A rope hanging from a tree. Leading nowhere.',
+                'A small wooden bridge. Over dry ground.',
+                'A table. A glass. Still steaming.',
+                'A path of lit candles. Ends at a rock. Nothing more.',
+                'A stone. One word carved: TURN BACK.'
+            ];
+            this.notification = { text: mysteryTexts[this.mysteryEvent.id], timer: 300 };
+        }
+    }
+
+    // --- ELDER ---
+    if (!this.indoors && !this.elder && !this.elderDialogue && !this.nightActive) {
+        this.elderCooldown--;
+        if (this.elderCooldown <= 0) {
+            var eAngle = Math.random() * Math.PI * 2;
+            var eDist = 200 + Math.random() * 150;
+            this.elder = {
+                x: this.player.x + Math.cos(eAngle) * eDist,
+                y: this.player.y + Math.sin(eAngle) * eDist,
+                tale: Math.floor(Math.random() * this.elderTales.length),
+                timer: 0,
+                female: Math.random() < 0.5
+            };
+            this.elderCooldown = 18000 + Math.floor(Math.random() * 36000);
+        }
+    }
+    if (this.elder && !this.elderDialogue) {
+        this.elder.timer++;
+        if (this.elder.timer > 5400) {
+            this.elder = null;
+        } else {
+            var edx = this.player.x - this.elder.x;
+            var edy = this.player.y - this.elder.y;
+            var eDist2 = Math.sqrt(edx * edx + edy * edy);
+            if (eDist2 < 60 && !this.elderPrompt) {
+                this.elderPrompt = true;
+            }
+            if (eDist2 >= 80) {
+                this.elderPrompt = false;
+            }
+        }
+    }
 };
 
 TWB.Game.prototype.render = function() {
@@ -2094,6 +3023,18 @@ TWB.Game.prototype.render = function() {
                 if (sprite) {
                     ctx.drawImage(sprite, Math.floor(tx * TWB.TILE - cam.x), Math.floor(ty * TWB.TILE - cam.y));
                 }
+                var trailKey = tx + ',' + ty;
+                if (this.shadowTrails[trailKey]) {
+                    var trailAlpha = Math.min(0.6, this.shadowTrails[trailKey] * 0.12);
+                    ctx.fillStyle = 'rgba(5,0,15,' + trailAlpha.toFixed(2) + ')';
+                    ctx.fillRect(Math.floor(tx * TWB.TILE - cam.x), Math.floor(ty * TWB.TILE - cam.y), TWB.TILE, TWB.TILE);
+                }
+                var snowKey = tx + ',' + ty;
+                if (this.snowAccum[snowKey]) {
+                    var sa = this.snowAccum[snowKey];
+                    ctx.fillStyle = 'rgba(210,210,220,' + (sa * 0.7).toFixed(2) + ')';
+                    ctx.fillRect(Math.floor(tx * TWB.TILE - cam.x), Math.floor(ty * TWB.TILE - cam.y), TWB.TILE, TWB.TILE);
+                }
             }
         }
     }
@@ -2109,7 +3050,7 @@ TWB.Game.prototype.render = function() {
     }
 
     renderList.push({ kind: 'player', sortY: this.player.y });
-    renderList.push({ kind: 'wolf', sortY: this.wolf.y });
+    if (!this.dogStolen) renderList.push({ kind: 'wolf', sortY: this.wolf.y });
 
     renderList.sort(function(a, b) { return a.sortY - b.sortY; });
 
@@ -2124,21 +3065,30 @@ TWB.Game.prototype.render = function() {
         }
     }
 
+    if (this.questSymbol && this.dogStolen && !this.indoors) this.drawQuestSymbol();
+    if (this.questRevealed && this.dogStolen && !this.indoors && this.questDogPos) this.drawQuestDogGlow();
+    if (!this.indoors && this.mysteryEvent && !this.mysteryEvent.discovered) this.drawMysteryGlow();
     if (!this.indoors) this.drawWildlife();
+    if (!this.indoors && this.elder) this.drawElder();
     if (!this.indoors && this.shadows.length > 0) this.drawShadows();
+    if (!this.indoors && this.phantomLight) this.drawPhantomLight();
+    if (!this.indoors && this.phantom2 && this.phantom2.on) this.drawPhantom2();
     this.drawFire();
     this.drawLighting();
     if (this.indoors && this.doorShake > 0) this.drawDoorShake();
     if (this.indoors && this.stranger) this.drawStranger();
     if (this.raining && !this.indoors) this.drawRain();
+    if (this.snowing && !this.indoors) this.drawSnow();
     if (this.fogDensity > 0 && !this.indoors) this.drawFog();
     this.drawCold();
+    if (this.distortion > 0.1 && this.indoors) this.drawDistortion();
     this.drawClock();
     this.drawHUD();
     if (this.backpackOpen) this.drawBackpack();
     if (this.craftingOpen) this.drawCrafting();
     this.drawMenu();
     this.drawNotification();
+    if (this.elderDialogue) this.drawElderDialogue();
     if (this.mapOpen) this.drawMap();
     if (this.readingNote) this.drawNote();
     if (this.windowView) this.drawWindowView();
@@ -2148,6 +3098,7 @@ TWB.Game.prototype.render = function() {
 };
 
 TWB.Game.prototype.drawObject = function(obj) {
+    if (obj.type === 'herb_vikos' && obj.picked) return;
     var sprite = TWB.Sprites[obj.type];
     if (!sprite) return;
     var anchor = TWB.getSpriteAnchor(obj.type);
@@ -2155,7 +3106,7 @@ TWB.Game.prototype.drawObject = function(obj) {
     var dy = Math.floor(obj.y - anchor.y - this.camera.y);
     var ctx = this.ctx;
 
-    var swayTypes = { tree_pine: 0.025, tree_oak: 0.018, bush: 0.012 };
+    var swayTypes = { tree_pine: 0.025, tree_oak: 0.018, bush: 0.012, herb_vikos: 0.015 };
     var swayAmt = swayTypes[obj.type];
     if (swayAmt) {
         var phase = this.fireTime * 0.015 + obj.x * 0.05 + obj.y * 0.03;
@@ -2243,19 +3194,31 @@ TWB.Game.prototype.drawFire = function() {
         var flameScale = 0.3 + 0.7 * fuelPct;
         var alpha = 0.2 + 0.5 * fuelPct;
 
+        var herbBuff = (obj.type === 'campfire' && this.fireBuff > 0) || (obj.type === 'fireplace' && this.fireBuffFP > 0);
         for (var i = 0; i < flameCount; i++) {
             var flick = Math.sin(t * 0.15 + i * 1.5 + oi) * 3;
             var h = (8 + Math.sin(t * 0.1 + i + oi) * 3) * flameScale;
-            ctx.fillStyle = 'rgba(255,100,20,' + alpha + ')';
-            ctx.fillRect(fx - 3 + i * 2 + flick, fy - h, 3, h);
-            ctx.fillStyle = 'rgba(255,200,50,' + (alpha * 0.7) + ')';
+            if (herbBuff) {
+                ctx.fillStyle = 'rgba(50,200,80,' + alpha + ')';
+                ctx.fillRect(fx - 3 + i * 2 + flick, fy - h, 3, h);
+                ctx.fillStyle = 'rgba(120,255,100,' + (alpha * 0.7) + ')';
+            } else {
+                ctx.fillStyle = 'rgba(255,100,20,' + alpha + ')';
+                ctx.fillRect(fx - 3 + i * 2 + flick, fy - h, 3, h);
+                ctx.fillStyle = 'rgba(255,200,50,' + (alpha * 0.7) + ')';
+            }
             ctx.fillRect(fx - 2 + i * 2 + flick, fy - h * 0.6, 2, h * 0.4);
         }
 
-        var glowR = 50 * fuelPct;
+        var glowR = (herbBuff ? 70 : 50) * fuelPct;
         var glow = ctx.createRadialGradient(fx, fy, 0, fx, fy, glowR);
-        glow.addColorStop(0, 'rgba(255,150,50,' + (0.1 * fuelPct) + ')');
-        glow.addColorStop(1, 'rgba(255,150,50,0)');
+        if (herbBuff) {
+            glow.addColorStop(0, 'rgba(80,200,100,' + (0.12 * fuelPct) + ')');
+            glow.addColorStop(1, 'rgba(80,200,100,0)');
+        } else {
+            glow.addColorStop(0, 'rgba(255,150,50,' + (0.1 * fuelPct) + ')');
+            glow.addColorStop(1, 'rgba(255,150,50,0)');
+        }
         ctx.fillStyle = glow;
         ctx.fillRect(fx - glowR - 10, fy - glowR - 10, glowR * 2 + 20, glowR * 2 + 20);
     }
@@ -2301,8 +3264,11 @@ TWB.Game.prototype.getBaseTemperature = function() {
     if (hour >= 20 || hour < 4) {
         var nightBase = -3 - Math.floor(Math.random() * 5);
         if (this.nightType === 'freeze') nightBase -= 5;
+        if (this.difficulty === 0) nightBase += 3;
+        else if (this.difficulty === 2) nightBase -= 3;
         return nightBase;
     }
+    if (this.difficulty === 0) return low + 3;
     return low;
 };
 
@@ -2310,6 +3276,15 @@ TWB.Game.prototype.getTemperatureBreakdown = function() {
     var base = this.getBaseTemperature();
     var wind = -Math.round(this.windSpeed * 3);
     var rain = (this.raining && !this.indoors) ? -4 : 0;
+    var snow = (this.snowing && !this.indoors) ? -5 : 0;
+    var snowGround = 0;
+    if (!this.indoors) {
+        var spx = Math.floor(this.player.x / TWB.TILE);
+        var spy = Math.floor(this.player.y / TWB.TILE);
+        var sgl = TWB.getSnowLevel(spx, spy);
+        if (sgl > 0) snowGround = -2 * sgl;
+        if (this.snowAccum[spx + ',' + spy]) snowGround = Math.min(snowGround, -2);
+    }
     var wet = -Math.round(this.wetness * 0.06);
 
     var fire = 0;
@@ -2353,16 +3328,34 @@ TWB.Game.prototype.getTemperatureBreakdown = function() {
         }
     }
 
+    var distort = 0;
+    if (this.indoors && this.distortion > 0.2) {
+        distort = -Math.round(Math.sin(this.gameTime * 0.1) * this.distortion * 10);
+    }
+
+    var cursedChill = 0;
+    if (this.cursedCabin >= 0 && !this.indoors) {
+        var ccData = TWB._cabinData[this.cursedCabin];
+        var ccdx2 = this.player.x - ccData.cx * TWB.TILE;
+        var ccdy2 = this.player.y - ccData.cy * TWB.TILE;
+        if (Math.sqrt(ccdx2 * ccdx2 + ccdy2 * ccdy2) < 160) cursedChill = -2;
+    }
+    if (this.indoors && this.currentCabinIdx === this.cursedCabin) cursedChill = -2;
+
     return {
         base: base,
         wind: wind,
         rain: rain,
+        snow: snow,
+        snowGround: snowGround,
         wetness: wet,
         fire: fire,
         shelter: shelter,
         clothing: clothing,
         shrine: shrineWarmth,
-        feelsLike: base + wind + rain + wet + fire + shelter + clothing + shrineWarmth
+        distortion: distort,
+        cursed: cursedChill,
+        feelsLike: base + wind + rain + snow + snowGround + wet + fire + shelter + clothing + shrineWarmth + distort + cursedChill
     };
 };
 
@@ -2421,6 +3414,141 @@ TWB.Game.prototype.drawCold = function() {
     ctx.fillRect(0, 0, w, h);
 };
 
+TWB.Game.prototype.drawElder = function() {
+    var ctx = this.ctx;
+    var e = this.elder;
+    var sx = Math.floor(e.x - this.camera.x);
+    var sy = Math.floor(e.y - this.camera.y);
+    if (sx < -50 || sx > this.canvas.width + 50 || sy < -50 || sy > this.canvas.height + 50) return;
+    var P = 2;
+    var dk = '#0a0a0a';
+    var md = '#141414';
+    var lt = '#1e1e1e';
+
+    ctx.fillStyle = 'rgba(0,0,0,0.15)';
+    ctx.fillRect(sx - 5 * P, sy - P, 10 * P, 2 * P);
+
+    ctx.fillStyle = md;
+    ctx.fillRect(sx - 2 * P, sy - 18 * P, P * 4, P);
+    ctx.fillStyle = dk;
+    ctx.fillRect(sx - 3 * P, sy - 17 * P, P * 5, P * 3);
+    ctx.fillStyle = md;
+    ctx.fillRect(sx - 2 * P, sy - 16 * P, P * 3, P * 2);
+    ctx.fillStyle = dk;
+    ctx.fillRect(sx - 2 * P, sy - 14 * P, P * 4, P);
+    ctx.fillStyle = dk;
+    ctx.fillRect(sx - 3 * P, sy - 13 * P, P * 6, P * 5);
+    ctx.fillStyle = md;
+    ctx.fillRect(sx - 2 * P, sy - 12 * P, P * 4, P * 3);
+    ctx.fillStyle = dk;
+    ctx.fillRect(sx - 4 * P, sy - 11 * P, P, P * 4);
+    ctx.fillRect(sx + 3 * P, sy - 11 * P, P, P * 4);
+    ctx.fillStyle = dk;
+    ctx.fillRect(sx - 2 * P, sy - 8 * P, P * 5, P * 4);
+    ctx.fillStyle = md;
+    ctx.fillRect(sx - P, sy - 7 * P, P * 3, P * 2);
+    ctx.fillStyle = dk;
+    ctx.fillRect(sx - 2 * P, sy - 4 * P, P * 2, P * 4);
+    ctx.fillRect(sx + P, sy - 4 * P, P * 2, P * 4);
+    ctx.fillStyle = dk;
+    ctx.fillRect(sx - 2 * P, sy, P * 2, P);
+    ctx.fillRect(sx + P, sy, P * 2, P);
+    ctx.fillStyle = lt;
+    ctx.fillRect(sx + 4 * P, sy - 15 * P, P, P * 14);
+    ctx.fillRect(sx + 4 * P, sy - P, P, P * 2);
+
+    if (this.elderPrompt) {
+        ctx.font = '7px "Press Start 2P", monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillStyle = '#d4a44a';
+        ctx.fillText('[E] Talk', sx, sy - 20 * P);
+        ctx.textAlign = 'left';
+    }
+};
+
+TWB.Game.prototype.drawElderDialogue = function() {
+    var ctx = this.ctx;
+    var d = this.elderDialogue;
+    var cw = this.canvas.width;
+    var ch = this.canvas.height;
+    var pw = 340, ph = 130;
+    var px = Math.floor((cw - pw) / 2);
+    var py = Math.floor(ch / 2) - 90;
+
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(0, 0, cw, ch);
+
+    ctx.fillStyle = 'rgba(20,18,14,0.95)';
+    ctx.fillRect(px, py, pw, ph);
+    ctx.strokeStyle = '#6a5a3a';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(px, py, pw, ph);
+    ctx.strokeStyle = '#d4a44a';
+    ctx.strokeRect(px + 1, py + 1, pw - 2, ph - 2);
+
+    ctx.font = '7px "Press Start 2P", monospace';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = '#8a7a5a';
+    ctx.fillText(d.female ? 'An old woman speaks...' : 'An old man speaks...', px + 10, py + 8);
+
+    ctx.font = '7px "Press Start 2P", monospace';
+    ctx.fillStyle = '#c8b888';
+    var words = d.text.split(' ');
+    var lines = [];
+    var line = '';
+    var maxW = pw - 24;
+    for (var i = 0; i < words.length; i++) {
+        var test = line ? line + ' ' + words[i] : words[i];
+        if (ctx.measureText(test).width > maxW) {
+            lines.push(line);
+            line = words[i];
+        } else {
+            line = test;
+        }
+    }
+    if (line) lines.push(line);
+    for (var li = 0; li < lines.length; li++) {
+        ctx.fillText(lines[li], px + 12, py + 24 + li * 12);
+    }
+
+    ctx.font = '6px "Press Start 2P", monospace';
+    ctx.fillStyle = '#5a5030';
+    ctx.textAlign = 'center';
+    ctx.fillText('click or [E] to close', px + pw / 2, py + ph - 12);
+    ctx.textAlign = 'left';
+};
+
+TWB.Game.prototype.drawMysteryGlow = function() {
+    var ctx = this.ctx;
+    var me = this.mysteryEvent;
+    var sx = Math.floor(me.x - this.camera.x);
+    var sy = Math.floor(me.y - this.camera.y);
+    if (sx < -50 || sx > this.canvas.width + 50 || sy < -50 || sy > this.canvas.height + 50) return;
+    ctx.save();
+    var pulse = 0.3 + Math.sin(this.fireTime * 0.03) * 0.15;
+    var grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, 30);
+    grad.addColorStop(0, 'rgba(200,180,120,' + pulse.toFixed(2) + ')');
+    grad.addColorStop(1, 'rgba(200,180,120,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(sx - 30, sy - 30, 60, 60);
+    ctx.restore();
+};
+
+TWB.Game.prototype.drawCloseBtn = function(x, y) {
+    var ctx = this.ctx;
+    var s = 14;
+    ctx.fillStyle = 'rgba(60,20,20,0.7)';
+    ctx.fillRect(x, y, s, s);
+    ctx.strokeStyle = '#804040';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x, y, s, s);
+    ctx.strokeStyle = '#cc6060';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(x + 3, y + 3); ctx.lineTo(x + s - 3, y + s - 3); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x + s - 3, y + 3); ctx.lineTo(x + 3, y + s - 3); ctx.stroke();
+};
+
 TWB.Game.prototype.drawClock = function() {
     var ctx = this.ctx;
     var totalMinutes = Math.floor(this.gameTime / 60);
@@ -2434,6 +3562,79 @@ TWB.Game.prototype.drawClock = function() {
     var boxW = 90;
     var cx = this.canvas.width - boxW - 8;
     var cy = 12;
+
+    var iconSize = 22, iconGap = 4, iconY = cy + 34;
+    var icons = [
+        { key: 'TAB', active: this.backpackOpen, label: 'B' },
+        { key: 'M', active: this.mapOpen, label: 'M' },
+        { key: 'C', active: this.craftingOpen, label: 'C' },
+        { key: 'L', active: this.flashlightOn, label: 'L' }
+    ];
+    var totalIconW = icons.length * iconSize + (icons.length - 1) * iconGap;
+    var iconStartX = cx - 6 + boxW - totalIconW;
+
+    for (var ii = 0; ii < icons.length; ii++) {
+        var icon = icons[ii];
+        var ix = iconStartX + ii * (iconSize + iconGap);
+        var iy = iconY;
+        var hovered = (this.iconHover === ii);
+
+        ctx.fillStyle = icon.active ? 'rgba(212,164,74,0.3)' : hovered ? 'rgba(40,40,60,0.8)' : 'rgba(6,6,10,0.6)';
+        ctx.fillRect(ix, iy, iconSize, iconSize);
+        ctx.strokeStyle = icon.active ? '#d4a44a' : hovered ? '#8a8a9a' : '#3a3a4a';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(ix, iy, iconSize, iconSize);
+
+        var col = icon.active ? '#d4a44a' : hovered ? '#b0b0c0' : '#6a6a7a';
+        if (icon.label === 'B') {
+            ctx.fillStyle = col;
+            ctx.fillRect(ix + 5, iy + 4, 12, 14);
+            ctx.fillStyle = icon.active ? 'rgba(212,164,74,0.25)' : hovered ? 'rgba(40,40,60,0.8)' : 'rgba(6,6,10,0.6)';
+            ctx.fillRect(ix + 7, iy + 7, 4, 4);
+            ctx.fillRect(ix + 12, iy + 7, 3, 4);
+        } else if (icon.label === 'M') {
+            ctx.fillStyle = col;
+            ctx.fillRect(ix + 4, iy + 4, 14, 14);
+            ctx.strokeStyle = icon.active ? '#1a1a0a' : '#2a2a3a';
+            ctx.lineWidth = 0.5;
+            ctx.beginPath(); ctx.moveTo(ix + 7, iy + 4); ctx.lineTo(ix + 7, iy + 18); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(ix + 11, iy + 4); ctx.lineTo(ix + 11, iy + 18); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(ix + 15, iy + 4); ctx.lineTo(ix + 15, iy + 18); ctx.stroke();
+        } else if (icon.label === 'C') {
+            ctx.strokeStyle = col;
+            ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(ix + 6, iy + 5); ctx.lineTo(ix + 6, iy + 17); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(ix + 16, iy + 5); ctx.lineTo(ix + 16, iy + 17); ctx.stroke();
+            ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(ix + 6, iy + 8); ctx.lineTo(ix + 16, iy + 8); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(ix + 6, iy + 14); ctx.lineTo(ix + 16, iy + 14); ctx.stroke();
+        } else if (icon.label === 'L') {
+            ctx.fillStyle = icon.active ? '#ffe080' : col;
+            ctx.beginPath();
+            ctx.moveTo(ix + 8, iy + 4);
+            ctx.lineTo(ix + 14, iy + 4);
+            ctx.lineTo(ix + 15, iy + 11);
+            ctx.lineTo(ix + 7, iy + 11);
+            ctx.closePath();
+            ctx.fill();
+            ctx.fillRect(ix + 8, iy + 12, 6, 3);
+            if (icon.active) {
+                ctx.strokeStyle = '#ffe080';
+                ctx.lineWidth = 0.5;
+                ctx.beginPath(); ctx.moveTo(ix + 11, iy + 16); ctx.lineTo(ix + 11, iy + 19); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(ix + 5, iy + 15); ctx.lineTo(ix + 3, iy + 18); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(ix + 17, iy + 15); ctx.lineTo(ix + 19, iy + 18); ctx.stroke();
+            }
+        }
+
+        if (hovered) {
+            ctx.fillStyle = '#d4a44a';
+            var ax = ix + Math.floor(iconSize / 2);
+            var ay = iy - 3;
+            ctx.fillRect(ax - 1, ay - 6, 2, 4);
+            ctx.fillRect(ax - 3, ay - 4, 6, 2);
+        }
+    }
 
     ctx.fillStyle = 'rgba(6,6,10,0.8)';
     ctx.fillRect(cx - 6, cy - 4, boxW, 30);
@@ -2450,7 +3651,7 @@ TWB.Game.prototype.drawClock = function() {
     ctx.font = '8px "Press Start 2P", monospace';
     var periodColor = hour < 5 ? '#4060a0' : hour < 7 ? '#d08040' : hour < 12 ? '#a0a060' : hour < 17 ? '#c0b060' : hour < 20 ? '#c08030' : '#4060a0';
     ctx.fillStyle = periodColor;
-    var periodSuffix = this.raining ? ' RAIN' : '';
+    var periodSuffix = this.raining ? ' RAIN' : (this.snowing ? ' SNOW' : '');
     if (this.nightActive && this.nightType === 'freeze') periodSuffix = ' STORM';
     else if (this.nightActive && this.nightType === 'shadow_surge') periodSuffix = ' DARK';
     ctx.fillText(period + periodSuffix, cx, cy + 16);
@@ -2810,6 +4011,46 @@ TWB.Game.prototype.drawRain = function() {
     ctx.fillRect(0, 0, w, h);
 };
 
+TWB.Game.prototype.drawSnow = function() {
+    var ctx = this.ctx;
+    var w = this.canvas.width;
+    var h = this.canvas.height;
+
+    while (this.snowFlakes.length < 150) {
+        this.snowFlakes.push({
+            x: Math.random() * w,
+            y: Math.random() * h,
+            r: 1 + Math.random() * 2,
+            speed: 0.5 + Math.random() * 1.2,
+            drift: -0.3 + Math.random() * 0.6,
+            wobble: Math.random() * Math.PI * 2
+        });
+    }
+
+    ctx.save();
+    for (var i = 0; i < this.snowFlakes.length; i++) {
+        var f = this.snowFlakes[i];
+        var alpha = 0.4 + f.r * 0.15;
+        ctx.fillStyle = 'rgba(220,220,230,' + alpha.toFixed(2) + ')';
+        ctx.beginPath();
+        ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2);
+        ctx.fill();
+        f.y += f.speed;
+        f.wobble += 0.03;
+        f.x += f.drift + Math.sin(f.wobble) * 0.3;
+        if (f.y > h) {
+            f.y = -f.r;
+            f.x = Math.random() * w;
+        }
+        if (f.x < -5) f.x = w + 3;
+        if (f.x > w + 5) f.x = -3;
+    }
+    ctx.restore();
+
+    ctx.fillStyle = 'rgba(180,185,200,0.04)';
+    ctx.fillRect(0, 0, w, h);
+};
+
 TWB.Game.prototype.drawFog = function() {
     var ctx = this.ctx;
     var w = this.canvas.width;
@@ -2941,6 +4182,97 @@ TWB.Game.prototype.drawStranger = function() {
     }
 };
 
+TWB.Game.prototype.drawQuestDogGlow = function() {
+    var ctx = this.ctx;
+    var cam = this.camera;
+    var dx = Math.floor(this.questDogPos.x - cam.x);
+    var dy = Math.floor(this.questDogPos.y - cam.y);
+    if (dx < -60 || dx > this.canvas.width + 60 || dy < -60 || dy > this.canvas.height + 60) return;
+    var pulse = 0.3 + Math.sin(this.fireTime * 0.06) * 0.2;
+    ctx.save();
+    var glow = ctx.createRadialGradient(dx, dy, 0, dx, dy, 40);
+    glow.addColorStop(0, 'rgba(200,160,40,' + pulse + ')');
+    glow.addColorStop(0.5, 'rgba(200,100,20,' + (pulse * 0.4) + ')');
+    glow.addColorStop(1, 'rgba(200,60,20,0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(dx - 40, dy - 40, 80, 80);
+    ctx.restore();
+};
+
+TWB.Game.prototype.drawQuestSymbol = function() {
+    var ctx = this.ctx;
+    var cam = this.camera;
+    var sx = Math.floor(this.questSymbol.x - cam.x);
+    var sy = Math.floor(this.questSymbol.y - cam.y);
+    if (sx < -40 || sx > this.canvas.width + 40 || sy < -40 || sy > this.canvas.height + 40) return;
+    var pulse = Math.sin(this.fireTime * 0.04) * 0.15;
+    ctx.save();
+    ctx.globalAlpha = 0.6 + pulse;
+    ctx.strokeStyle = '#2a0030';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(sx, sy, 10, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(sx - 6, sy - 6);
+    ctx.lineTo(sx + 6, sy + 6);
+    ctx.moveTo(sx + 6, sy - 6);
+    ctx.lineTo(sx - 6, sy + 6);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - 8);
+    ctx.lineTo(sx, sy + 8);
+    ctx.moveTo(sx - 8, sy);
+    ctx.lineTo(sx + 8, sy);
+    ctx.stroke();
+    ctx.fillStyle = '#1a0020';
+    ctx.beginPath();
+    ctx.arc(sx, sy, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+};
+
+TWB.Game.prototype.drawDistortion = function() {
+    var ctx = this.ctx;
+    var cw = this.canvas.width;
+    var ch = this.canvas.height;
+    var d = this.distortion;
+
+    ctx.save();
+    var vigA = d * 0.4;
+    var vg = ctx.createRadialGradient(cw / 2, ch / 2, cw * 0.25, cw / 2, ch / 2, cw * 0.6);
+    vg.addColorStop(0, 'rgba(0,0,0,0)');
+    vg.addColorStop(1, 'rgba(10,0,20,' + vigA + ')');
+    ctx.fillStyle = vg;
+    ctx.fillRect(0, 0, cw, ch);
+
+    if (this.distortionFlicker > 0) {
+        var flkA = 0.05 + d * 0.1;
+        ctx.fillStyle = 'rgba(120,80,160,' + flkA + ')';
+        ctx.fillRect(0, 0, cw, ch);
+        var scanY = Math.floor(Math.random() * ch);
+        var scanH = 2 + Math.floor(Math.random() * 4);
+        ctx.fillStyle = 'rgba(255,255,255,0.03)';
+        ctx.fillRect(0, scanY, cw, scanH);
+    }
+
+    if (d > 0.5) {
+        var lineCount = Math.floor((d - 0.5) * 20);
+        ctx.strokeStyle = 'rgba(60,20,80,0.08)';
+        ctx.lineWidth = 1;
+        for (var li = 0; li < lineCount; li++) {
+            var ly = Math.floor(Math.random() * ch);
+            var lx = Math.floor(Math.random() * cw * 0.3);
+            var ll = 20 + Math.floor(Math.random() * 60);
+            ctx.beginPath();
+            ctx.moveTo(lx, ly);
+            ctx.lineTo(lx + ll, ly + (Math.random() - 0.5) * 4);
+            ctx.stroke();
+        }
+    }
+    ctx.restore();
+};
+
 TWB.Game.prototype.canCraft = function(recipe) {
     for (var i = 0; i < recipe.needs.length; i++) {
         if (this.getItemCount(recipe.needs[i][0]) < recipe.needs[i][1]) return false;
@@ -2990,10 +4322,12 @@ TWB.Game.prototype.drawCrafting = function() {
     ctx.lineWidth = 1;
     ctx.strokeRect(px, py, pw, ph);
 
+    this.drawCloseBtn(px + pw - 20, py + 4);
+
     ctx.font = '8px "Press Start 2P", monospace';
     ctx.textBaseline = 'top';
     ctx.fillStyle = '#d4a44a';
-    ctx.fillText('CRAFTING [C]', px + 10, py + 8);
+    ctx.fillText('CRAFTING', px + 10, py + 8);
 
     ctx.font = '8px "Press Start 2P", monospace';
     for (var i = 0; i < TWB.RECIPES.length; i++) {
@@ -3096,6 +4430,56 @@ TWB.Game.prototype.drawNotification = function() {
     ctx.restore();
 };
 
+TWB.Game.prototype.drawPhantomLight = function() {
+    var pl = this.phantomLight;
+    if (!pl || pl.brightness <= 0) return;
+    var ctx = this.ctx;
+    var cam = this.camera;
+    var sx = Math.floor(pl.x - cam.x), sy = Math.floor(pl.y - cam.y);
+    var r = 40 + pl.brightness * 30;
+    var flicker = 0.9 + Math.sin(this.gameTime * 0.15) * 0.1;
+    var alpha = pl.brightness * 0.6 * flicker;
+    var grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, r);
+    grad.addColorStop(0, 'rgba(255,180,60,' + alpha + ')');
+    grad.addColorStop(0.4, 'rgba(255,140,30,' + (alpha * 0.5) + ')');
+    grad.addColorStop(1, 'rgba(255,100,20,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(sx - r, sy - r, r * 2, r * 2);
+};
+
+TWB.Game.prototype.drawPhantom2 = function() {
+    var p2 = this.phantom2;
+    if (!p2) return;
+    var ctx = this.ctx;
+    var cam = this.camera;
+    var sx = Math.floor(p2.x - cam.x), sy = Math.floor(p2.y - cam.y);
+    var beamLen = 50 + Math.sin(this.gameTime * 0.05) * 10;
+    var beamW = 0.25;
+    var ex = sx + Math.cos(p2.dir) * beamLen;
+    var ey = sy + Math.sin(p2.dir) * beamLen;
+    var flick = 0.85 + Math.sin(this.gameTime * 0.2) * 0.15;
+    var alpha = 0.4 * flick;
+    if (p2.timer > p2.maxTime) alpha *= Math.max(0, 1 - (p2.timer - p2.maxTime) / 60);
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = '#ffe8c0';
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(ex + Math.cos(p2.dir + beamW) * 15, ey + Math.sin(p2.dir + beamW) * 15);
+    ctx.lineTo(ex + Math.cos(p2.dir - beamW) * 15, ey + Math.sin(p2.dir - beamW) * 15);
+    ctx.closePath();
+    ctx.fill();
+
+    var grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, 12);
+    grad.addColorStop(0, 'rgba(255,240,200,0.5)');
+    grad.addColorStop(1, 'rgba(255,240,200,0)');
+    ctx.globalAlpha = alpha * 1.5;
+    ctx.fillStyle = grad;
+    ctx.fillRect(sx - 12, sy - 12, 24, 24);
+    ctx.restore();
+};
+
 TWB.Game.prototype.drawMap = function() {
     var ctx = this.ctx;
     var cw = this.canvas.width;
@@ -3108,6 +4492,56 @@ TWB.Game.prototype.drawMap = function() {
         this._renderMapStatic(this._mapCanvas.getContext('2d'), cw, ch);
     }
     ctx.drawImage(this._mapCanvas, 0, 0);
+
+    if (this.dogStolen && this.questPhase > 0) {
+        var pad = 24, bw2 = 10;
+        var qmX = pad + bw2, qmY = pad + bw2;
+        var qmW = cw - (pad + bw2) * 2, qmH = ch - (pad + bw2) * 2;
+        var qsx = qmW / TWB.COLS, qsy = qmH / TWB.ROWS;
+
+        for (var qmi = 0; qmi < this.questShrines.length; qmi++) {
+            var qsh = this.objects[this.questShrines[qmi]];
+            if (!qsh) continue;
+            var qshx = qmX + (qsh.x / TWB.TILE) * qsx;
+            var qshy = qmY + (qsh.y / TWB.TILE) * qsy;
+            ctx.save();
+            if (qsh.lit) {
+                ctx.fillStyle = '#d4a44a';
+                ctx.strokeStyle = '#c09030';
+            } else {
+                var qPulse = 0.5 + Math.sin(this.fireTime * 0.05 + qmi * 2) * 0.3;
+                ctx.fillStyle = 'rgba(160,40,40,' + qPulse + ')';
+                ctx.strokeStyle = '#802020';
+            }
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(qshx, qshy, 6, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.font = '6px "Press Start 2P", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(qsh.lit ? '✓' : '?', qshx, qshy + 2);
+            ctx.restore();
+        }
+
+        if (this.questRevealed && this.questDogPos) {
+            var qdmx = qmX + (this.questDogPos.x / TWB.TILE) * qsx;
+            var qdmy = qmY + (this.questDogPos.y / TWB.TILE) * qsy;
+            var qPulse2 = 0.4 + Math.sin(this.fireTime * 0.08) * 0.4;
+            ctx.save();
+            ctx.fillStyle = 'rgba(200,30,30,' + qPulse2 + ')';
+            ctx.beginPath();
+            ctx.arc(qdmx, qdmy, 5 + Math.sin(this.fireTime * 0.08) * 2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#c02020';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.fillStyle = '#ff4040';
+            ctx.font = 'italic 7px Georgia, serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(this.dogName || 'Dog', qdmx, qdmy - 10);
+            ctx.restore();
+        }
+    }
 
     if (this.fogDensity > 0.3) {
         var pad = 24, bw = 10;
@@ -3137,174 +4571,144 @@ TWB.Game.prototype.drawMap = function() {
         ctx.fillText('Fog... last known position', cw / 2, ch - 30);
         ctx.restore();
     }
+
+    this.drawCloseBtn(cw - 28, 10);
 };
 
 TWB.Game.prototype._renderMapStatic = function(ctx, cw, ch) {
-    var pad = 24, bw = 10;
-    var ink = '#5a4630', inkL = '#8a7a58', red = '#8a3020';
+    var pad = 24, bw = 12;
+    var ink = '#3a2a14', inkL = '#7a6a48', inkM = '#5a4630';
+    var red = '#8a3020';
 
-    ctx.fillStyle = '#d4c4a0';
+    ctx.fillStyle = '#e2d4b0';
     ctx.fillRect(0, 0, cw, ch);
-
-    for (var i = 0; i < 800; i++) {
-        var px = TWB.hash(i, 8000) % cw;
-        var py = TWB.hash(8000, i) % ch;
-        ctx.fillStyle = (i % 3 === 0) ? '#c8b890' : (i % 3 === 1) ? '#dcd0b0' : '#c0b080';
+    for (var i = 0; i < 1500; i++) {
+        var px = TWB.hash(i, 8000) % cw, py = TWB.hash(8000, i) % ch;
+        var ci = i % 6;
+        ctx.fillStyle = ci < 2 ? '#d8c89a' : ci < 4 ? '#ecdcb8' : '#cebe90';
         ctx.fillRect(px, py, 1 + i % 2, 1 + (i >> 1) % 2);
     }
-
-    for (var i = 0; i < 5; i++) {
-        var sx = TWB.hash(i * 7, 8500) % cw;
-        var sy = TWB.hash(8500, i * 7) % ch;
-        var sr = 25 + TWB.hash(i * 11, 8600) % 35;
-        var grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, sr);
-        grad.addColorStop(0, 'rgba(155,135,105,0.12)');
-        grad.addColorStop(1, 'rgba(155,135,105,0)');
+    for (var i = 0; i < 10; i++) {
+        var stx = TWB.hash(i * 7, 8500) % cw, sty = TWB.hash(8500, i * 7) % ch;
+        var str = 20 + TWB.hash(i * 11, 8600) % 60;
+        var grad = ctx.createRadialGradient(stx, sty, 0, stx, sty, str);
+        grad.addColorStop(0, 'rgba(140,120,80,0.18)');
+        grad.addColorStop(1, 'rgba(140,120,80,0)');
         ctx.fillStyle = grad;
-        ctx.fillRect(sx - sr, sy - sr, sr * 2, sr * 2);
+        ctx.fillRect(stx - str, sty - str, str * 2, str * 2);
     }
 
-    var ox = pad, oy = pad;
-    var ow = cw - pad * 2, oh = ch - pad * 2;
+    var ox = pad, oy = pad, ow = cw - pad * 2, oh = ch - pad * 2;
     var ix = pad + bw, iy = pad + bw;
     var iw = cw - (pad + bw) * 2, ih = ch - (pad + bw) * 2;
 
     ctx.save();
     ctx.beginPath();
     ctx.rect(ox, oy, ow, oh);
-    ctx.moveTo(ix + iw, iy);
-    ctx.lineTo(ix, iy);
-    ctx.lineTo(ix, iy + ih);
-    ctx.lineTo(ix + iw, iy + ih);
+    ctx.moveTo(ix + iw, iy); ctx.lineTo(ix, iy); ctx.lineTo(ix, iy + ih); ctx.lineTo(ix + iw, iy + ih);
     ctx.closePath();
     ctx.clip('evenodd');
-    ctx.fillStyle = '#b8a880';
+    ctx.fillStyle = '#8a7050';
     ctx.fillRect(ox, oy, ow, oh);
-    ctx.strokeStyle = '#9a8a68';
-    ctx.lineWidth = 0.5;
+    ctx.strokeStyle = '#6a5030';
+    ctx.lineWidth = 0.8;
     for (var d = -ch; d < cw + ch; d += 4) {
-        ctx.beginPath();
-        ctx.moveTo(d, 0);
-        ctx.lineTo(d + ch, ch);
-        ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(d, oy); ctx.lineTo(d + oh, oy + oh); ctx.stroke();
     }
+    ctx.fillStyle = '#a08a60';
+    ctx.globalAlpha = 0.3;
+    for (var d = -ch; d < cw + ch; d += 4) {
+        ctx.beginPath(); ctx.moveTo(d + 1, oy); ctx.lineTo(d + oh + 1, oy + oh); ctx.stroke();
+    }
+    ctx.globalAlpha = 1.0;
     ctx.restore();
 
-    ctx.strokeStyle = '#6a5030';
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = ink;
+    ctx.lineWidth = 2.5;
     ctx.strokeRect(ox, oy, ow, oh);
+    ctx.strokeStyle = ink;
     ctx.lineWidth = 1.5;
     ctx.strokeRect(ix, iy, iw, ih);
 
-    var corners = [[ox, oy], [ox + ow, oy], [ox, oy + oh], [ox + ow, oy + oh]];
-    for (var ci = 0; ci < 4; ci++) {
-        ctx.fillStyle = '#6a5030';
-        ctx.beginPath();
-        ctx.arc(corners[ci][0], corners[ci][1], 4, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#d4c4a0';
-        ctx.beginPath();
-        ctx.arc(corners[ci][0], corners[ci][1], 2, 0, Math.PI * 2);
-        ctx.fill();
+    var cjS = bw + 2;
+    var corners = [[ox - 1, oy - 1], [ox + ow + 1, oy - 1], [ox - 1, oy + oh + 1], [ox + ow + 1, oy + oh + 1]];
+    for (var ci2 = 0; ci2 < 4; ci2++) {
+        var ccx = corners[ci2][0], ccy = corners[ci2][1];
+        var dx2 = ci2 % 2 === 0 ? 1 : -1, dy2 = ci2 < 2 ? 1 : -1;
+        ctx.fillStyle = '#7a6040';
+        ctx.fillRect(ccx - (dx2 > 0 ? 1 : cjS), ccy - (dy2 > 0 ? 1 : cjS), cjS + 1, cjS + 1);
+        ctx.strokeStyle = ink;
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(ccx - (dx2 > 0 ? 1 : cjS), ccy - (dy2 > 0 ? 1 : cjS), cjS + 1, cjS + 1);
+        ctx.strokeStyle = '#5a4020';
+        ctx.lineWidth = 0.6;
+        var jcx2 = ccx + (dx2 > 0 ? cjS / 2 : -cjS / 2);
+        var jcy2 = ccy + (dy2 > 0 ? cjS / 2 : -cjS / 2);
+        ctx.beginPath(); ctx.moveTo(jcx2 - 3, jcy2 - 3); ctx.lineTo(jcx2 + 3, jcy2 + 3); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(jcx2 + 3, jcy2 - 3); ctx.lineTo(jcx2 - 3, jcy2 + 3); ctx.stroke();
     }
 
     var mapX = ix, mapY = iy, mapW = iw, mapH = ih;
     var sx = mapW / TWB.COLS, sy = mapH / TWB.ROWS;
 
     ctx.fillStyle = inkL;
-    for (var i = 0; i < 45; i++) {
-        var mtx, mty, edge = i % 4;
-        if (edge === 0) { mtx = 10 + TWB.hash(i * 7, 9000) % (TWB.COLS - 20); mty = TWB.hash(i * 11, 9100) % 14; }
-        else if (edge === 1) { mtx = 10 + TWB.hash(i * 7, 9000) % (TWB.COLS - 20); mty = TWB.ROWS - 14 + TWB.hash(i * 11, 9100) % 14; }
-        else if (edge === 2) { mtx = TWB.hash(i * 7, 9000) % 14; mty = 10 + TWB.hash(i * 11, 9100) % (TWB.ROWS - 20); }
-        else { mtx = TWB.COLS - 14 + TWB.hash(i * 7, 9000) % 14; mty = 10 + TWB.hash(i * 11, 9100) % (TWB.ROWS - 20); }
-        var mmx = mapX + mtx * sx, mmy = mapY + mty * sy;
-        var ms = 3 + TWB.hash(i * 13, 9200) % 4;
-        ctx.fillStyle = inkL;
+    ctx.strokeStyle = inkL;
+    ctx.lineWidth = 0.5;
+    for (var gi = 0; gi < 350; gi++) {
+        var gx = mapX + (TWB.hash(gi * 3, 7700) % Math.floor(mapW));
+        var gy = mapY + (TWB.hash(7700, gi * 3) % Math.floor(mapH));
+        var gs = 1.5 + (TWB.hash(gi * 7, 7701) % 3) * 0.5;
         ctx.beginPath();
-        ctx.moveTo(mmx, mmy - ms);
-        ctx.lineTo(mmx - ms * 0.7, mmy + ms * 0.3);
-        ctx.lineTo(mmx + ms * 0.7, mmy + ms * 0.3);
+        ctx.moveTo(gx, gy);
+        ctx.lineTo(gx - gs * 0.5, gy - gs);
+        ctx.lineTo(gx + gs * 0.5, gy - gs);
         ctx.closePath();
         ctx.fill();
     }
 
-    var treeStep = 10;
-    for (var tty = 12; tty < TWB.ROWS - 12; tty += treeStep) {
-        for (var ttx = 12; ttx < TWB.COLS - 12; ttx += treeStep) {
-            var h = TWB.hash(ttx, tty) % 100;
-            var isBorder = tty <= 8 || tty >= TWB.ROWS - 8 || ttx >= TWB.COLS - 8 || ttx <= 8;
-            var isEdge = tty <= 15 || tty >= TWB.ROWS - 15 || ttx >= TWB.COLS - 15 || ttx <= 15;
-            var threshold = isBorder ? 70 : (isEdge ? 40 : 20);
-            if (h >= threshold) continue;
-
-            var rc1 = TWB.getRiverCenter(tty);
-            if (Math.abs(ttx - rc1) < 6) continue;
-            var rp = TWB._riverParams;
-            if (rp && tty > rp.r2startY && tty < rp.r2endY) {
-                if (Math.abs(ttx - TWB.getSecondRiver(tty)) < 6) continue;
-            }
-
-            var tmx = mapX + ttx * sx, tmy = mapY + tty * sy;
-            var dark = h < threshold / 2;
-            ctx.fillStyle = dark ? ink : inkL;
-            ctx.strokeStyle = dark ? ink : inkL;
-            ctx.lineWidth = 0.7;
-            ctx.beginPath();
-            ctx.arc(tmx, tmy - 2, 2.8, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.moveTo(tmx, tmy + 0.8);
-            ctx.lineTo(tmx, tmy + 3.5);
-            ctx.stroke();
-        }
-    }
-
     ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
 
-    ctx.lineWidth = 2.5;
-    ctx.strokeStyle = '#7a6a4a';
-    ctx.beginPath();
-    ctx.moveTo(mapX + TWB.getRiverCenter(0) * sx, mapY);
-    for (var ty = 2; ty < TWB.ROWS; ty += 2) {
-        ctx.lineTo(mapX + TWB.getRiverCenter(ty) * sx, mapY + ty * sy);
-    }
-    ctx.stroke();
-    ctx.lineWidth = 0.5;
-    ctx.strokeStyle = '#9a8a68';
-    for (var side = -1; side <= 1; side += 2) {
-        ctx.beginPath();
-        ctx.moveTo(mapX + (TWB.getRiverCenter(0) + side * 3) * sx, mapY);
-        for (var ty = 2; ty < TWB.ROWS; ty += 2) {
-            ctx.lineTo(mapX + (TWB.getRiverCenter(ty) + side * 3) * sx, mapY + ty * sy);
-        }
-        ctx.stroke();
-    }
+    function drawRiverSegment(getCenter, startY, endY, width, bankW) {
+        ctx.save();
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
 
-    var rp = TWB._riverParams;
-    if (rp) {
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = '#7a6a4a';
-        ctx.beginPath();
-        ctx.moveTo(mapX + TWB.getSecondRiver(rp.r2startY) * sx, mapY + rp.r2startY * sy);
-        for (var ty = rp.r2startY + 2; ty < rp.r2endY; ty += 2) {
-            ctx.lineTo(mapX + TWB.getSecondRiver(ty) * sx, mapY + ty * sy);
-        }
-        ctx.stroke();
-        ctx.lineWidth = 0.5;
-        ctx.strokeStyle = '#9a8a68';
+        ctx.lineWidth = 1.2;
+        ctx.strokeStyle = '#8a9098';
         for (var side = -1; side <= 1; side += 2) {
             ctx.beginPath();
-            ctx.moveTo(mapX + (TWB.getSecondRiver(rp.r2startY) + side * 2) * sx, mapY + rp.r2startY * sy);
-            for (var ty = rp.r2startY + 2; ty < rp.r2endY; ty += 2) {
-                ctx.lineTo(mapX + (TWB.getSecondRiver(ty) + side * 2) * sx, mapY + ty * sy);
+            ctx.moveTo(mapX + (getCenter(startY) + side * bankW) * sx, mapY + startY * sy);
+            for (var ty = startY + 2; ty < endY; ty += 2) {
+                var wobble = Math.sin(ty * 0.4 + side * 2) * 0.3;
+                ctx.lineTo(mapX + (getCenter(ty) + side * bankW + wobble) * sx, mapY + ty * sy);
             }
             ctx.stroke();
         }
+
+        ctx.lineWidth = 0.4;
+        ctx.strokeStyle = 'rgba(120,140,155,0.4)';
+        for (var wy = startY + 6; wy < endY - 4; wy += 10) {
+            var wcx = getCenter(wy);
+            var wx = mapX + wcx * sx;
+            var wyy = mapY + wy * sy;
+            ctx.beginPath();
+            ctx.moveTo(wx - 2, wyy);
+            ctx.quadraticCurveTo(wx, wyy - 1, wx + 2, wyy);
+            ctx.stroke();
+        }
+
+        ctx.restore();
     }
 
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = inkL;
+    drawRiverSegment(TWB.getRiverCenter, 0, TWB.ROWS, 3.5, 4);
+    var rp = TWB._riverParams;
+    if (rp) {
+        drawRiverSegment(TWB.getSecondRiver, rp.r2startY, rp.r2endY, 2.5, 3);
+    }
+
+    ctx.lineWidth = 0.6;
+    ctx.strokeStyle = '#8a9098';
     for (var ti = 0; ti < TWB._tributaries.length; ti++) {
         var t = TWB._tributaries[ti];
         ctx.beginPath();
@@ -3315,209 +4719,441 @@ TWB.Game.prototype._renderMapStatic = function(ctx, cw, ch) {
         ctx.stroke();
     }
 
+    for (var szi = 0; szi < TWB._snowZones.length; szi++) {
+        var sz = TWB._snowZones[szi];
+        var szx = mapX + sz.cx * sx;
+        var szy = mapY + sz.cy * sy;
+        var szrx = sz.rx * sx;
+        var szry = sz.ry * sy;
+        ctx.beginPath();
+        ctx.ellipse(szx, szy, szrx, szry, 0, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(200,200,215,0.15)';
+        ctx.fill();
+    }
+
+    for (var li = 0; li < TWB._lakeData.length; li++) {
+        var lake = TWB._lakeData[li];
+        var lkx = mapX + lake.cx * sx;
+        var lky = mapY + lake.cy * sy;
+        var lkrx = lake.rx * sx * 1.2;
+        var lkry = lake.ry * sy * 1.2;
+        ctx.save();
+        ctx.translate(lkx, lky);
+        ctx.rotate(lake.rot);
+        ctx.beginPath();
+        ctx.ellipse(0, 0, lkrx, lkry, 0, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(100,130,160,0.3)';
+        ctx.fill();
+        ctx.strokeStyle = '#8a9098';
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    function drawPine(x, y, s) {
+        var layers = Math.max(3, Math.floor(s * 0.8));
+        var trunkH = s * 0.35;
+        ctx.strokeStyle = '#4a3518';
+        ctx.lineWidth = Math.max(0.8, s * 0.15);
+        ctx.beginPath(); ctx.moveTo(x, y + trunkH); ctx.lineTo(x, y); ctx.stroke();
+
+        for (var li = layers - 1; li >= 0; li--) {
+            var ly = y - li * s * 0.28;
+            var lw = s * 0.2 + (layers - li) * s * 0.22;
+            var droop = s * 0.18;
+            var col = li % 2 === 0 ? '#3a6830' : '#2d5428';
+            ctx.fillStyle = col;
+            ctx.beginPath();
+            ctx.moveTo(x, ly - s * 0.35);
+            ctx.quadraticCurveTo(x - lw * 0.5, ly - droop * 0.3, x - lw, ly + droop);
+            ctx.quadraticCurveTo(x - lw * 0.3, ly + droop * 0.5, x, ly);
+            ctx.quadraticCurveTo(x + lw * 0.3, ly + droop * 0.5, x + lw, ly + droop);
+            ctx.quadraticCurveTo(x + lw * 0.5, ly - droop * 0.3, x, ly - s * 0.35);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#2a4a20';
+            ctx.lineWidth = 0.3;
+            ctx.stroke();
+        }
+    }
+
+    function drawDecid(x, y, s, col1, col2) {
+        var trunkH = s * 0.55;
+        ctx.strokeStyle = '#5a4020';
+        ctx.lineWidth = Math.max(0.8, s * 0.12);
+        ctx.beginPath(); ctx.moveTo(x, y + trunkH); ctx.lineTo(x, y - s * 0.1); ctx.stroke();
+
+        var r = s * 0.5;
+        var lobes = [
+            [x - r * 0.4, y - r * 0.6, r * 0.55],
+            [x + r * 0.45, y - r * 0.5, r * 0.5],
+            [x, y - r * 1.0, r * 0.5],
+            [x - r * 0.15, y - r * 0.3, r * 0.6],
+            [x + r * 0.1, y - r * 0.7, r * 0.45]
+        ];
+        ctx.fillStyle = col1;
+        for (var li = 0; li < lobes.length; li++) {
+            ctx.beginPath();
+            ctx.arc(lobes[li][0], lobes[li][1], lobes[li][2], 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.fillStyle = col2;
+        ctx.beginPath(); ctx.arc(x - r * 0.2, y - r * 0.8, r * 0.35, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(x + r * 0.25, y - r * 0.9, r * 0.3, 0, Math.PI * 2); ctx.fill();
+
+        ctx.strokeStyle = ink;
+        ctx.lineWidth = 0.4;
+        ctx.beginPath();
+        var aStep = Math.PI * 2 / 20;
+        for (var ai = 0; ai <= 20; ai++) {
+            var ang = ai * aStep;
+            var maxR = 0;
+            for (var li = 0; li < lobes.length; li++) {
+                var ldx = x + Math.cos(ang) * r * 1.1 - lobes[li][0];
+                var ldy = y - r * 0.55 + Math.sin(ang) * r * 0.9 - lobes[li][1];
+                var dist = Math.sqrt(ldx * ldx + ldy * ldy);
+                if (dist < lobes[li][2] + 0.5) {
+                    var rr = r * 0.85 + Math.sin(ai * 1.7) * r * 0.15;
+                    if (rr > maxR) maxR = rr;
+                }
+            }
+            if (maxR === 0) maxR = r * 0.7 + Math.sin(ai * 2.3) * r * 0.1;
+            var ox2 = x + Math.cos(ang) * maxR;
+            var oy2 = y - r * 0.55 + Math.sin(ang) * maxR * 0.8;
+            if (ai === 0) ctx.moveTo(ox2, oy2);
+            else ctx.lineTo(ox2, oy2);
+        }
+        ctx.stroke();
+    }
+
+    var pineGreens = ['#3a6830', '#2d5428', '#456e38', '#325a2a', '#4a7840'];
+    var decidCols = [
+        ['#6a8a40', '#7a9a50'],
+        ['#5a7a35', '#6a8a45'],
+        ['#8a7a30', '#a09040'],
+        ['#7a6a25', '#907a35'],
+        ['#9a6a20', '#b08030']
+    ];
+
+    var treeStep = 8;
+    for (var tty = 10; tty < TWB.ROWS - 10; tty += treeStep) {
+        for (var ttx = 10; ttx < TWB.COLS - 10; ttx += treeStep) {
+            var h = TWB.hash(ttx, tty) % 100;
+            var isBorder = tty <= 8 || tty >= TWB.ROWS - 8 || ttx >= TWB.COLS - 8 || ttx <= 8;
+            var isEdge = tty <= 15 || tty >= TWB.ROWS - 15 || ttx >= TWB.COLS - 15 || ttx <= 15;
+            var threshold = isBorder ? 70 : (isEdge ? 40 : 22);
+            if (h >= threshold) continue;
+
+            var rc1 = TWB.getRiverCenter(tty);
+            if (Math.abs(ttx - rc1) < 7) continue;
+            var rp0 = TWB._riverParams;
+            if (rp0 && tty > rp0.r2startY && tty < rp0.r2endY) {
+                if (Math.abs(ttx - TWB.getSecondRiver(tty)) < 7) continue;
+            }
+
+            var tmx = mapX + ttx * sx, tmy = mapY + tty * sy;
+            var th2 = TWB.hash(ttx * 3, tty * 5);
+            var tSize = 3 + (th2 % 25) * 0.12;
+            var isPine = th2 % 5 < 3;
+
+            if (isPine) {
+                drawPine(tmx, tmy, tSize);
+            } else {
+                var dci = th2 % 5;
+                drawDecid(tmx, tmy, tSize, decidCols[dci][0], decidCols[dci][1]);
+            }
+        }
+    }
+
     for (var oi = 0; oi < this.objects.length; oi++) {
         var bo = this.objects[oi];
         if (bo.type !== 'boulder') continue;
-        var bx = mapX + (bo.x / TWB.TILE) * sx;
-        var by = mapY + (bo.y / TWB.TILE) * sy;
-        ctx.fillStyle = '#4a3a20';
-        ctx.beginPath();
-        ctx.moveTo(bx - 5, by + 2);
-        ctx.lineTo(bx - 3, by - 3);
-        ctx.lineTo(bx + 1, by - 4);
-        ctx.lineTo(bx + 5, by - 2);
-        ctx.lineTo(bx + 6, by + 1);
-        ctx.lineTo(bx + 3, by + 3);
-        ctx.lineTo(bx - 4, by + 3);
-        ctx.closePath();
-        ctx.fill();
-        ctx.strokeStyle = '#3a2a14';
-        ctx.lineWidth = 0.8;
-        ctx.stroke();
-        ctx.fillStyle = '#6a5a3a';
-        ctx.fillRect(bx - 2, by - 2, 3, 2);
+        var boh = TWB.hash(Math.floor(bo.x) * 13, Math.floor(bo.y) * 17);
+        var bx = mapX + (bo.x / TWB.TILE) * sx + ((boh % 21) - 10) * sx;
+        var by = mapY + (bo.y / TWB.TILE) * sy + (((boh >>> 8) % 21) - 10) * sy;
+        var bSeed = TWB.hash(Math.floor(bo.x), Math.floor(bo.y));
+        var nStones = 3 + bSeed % 3;
+        var bScale = 1.8;
+
+        for (var si = 0; si < nStones; si++) {
+            var sox = bx + (si - nStones / 2) * 4 * bScale + (TWB.hash(si * 7 + Math.floor(bo.x), 5555) % 5 - 2);
+            var soy = by + (TWB.hash(si * 11 + Math.floor(bo.y), 5556) % 4 - 1);
+            var srw = (3 + TWB.hash(si * 13 + Math.floor(bo.x), 5557) % 4) * bScale;
+            var srh = (2.5 + TWB.hash(si * 17 + Math.floor(bo.y), 5558) % 3) * bScale;
+
+            var stoneCol = si % 3 === 0 ? '#6a5a42' : si % 3 === 1 ? '#5a4a38' : '#7a6a50';
+            ctx.fillStyle = stoneCol;
+            ctx.beginPath();
+            ctx.moveTo(sox - srw, soy + srh * 0.2);
+            ctx.quadraticCurveTo(sox - srw * 0.8, soy - srh, sox, soy - srh);
+            ctx.quadraticCurveTo(sox + srw * 0.8, soy - srh, sox + srw, soy + srh * 0.2);
+            ctx.quadraticCurveTo(sox + srw * 0.5, soy + srh * 0.6, sox, soy + srh * 0.5);
+            ctx.quadraticCurveTo(sox - srw * 0.5, soy + srh * 0.6, sox - srw, soy + srh * 0.2);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.strokeStyle = ink;
+            ctx.lineWidth = 0.6;
+            ctx.stroke();
+
+            ctx.fillStyle = 'rgba(160,150,120,0.35)';
+            ctx.beginPath();
+            ctx.moveTo(sox - srw * 0.5, soy - srh * 0.7);
+            ctx.quadraticCurveTo(sox - srw * 0.2, soy - srh * 0.9, sox + srw * 0.1, soy - srh * 0.6);
+            ctx.quadraticCurveTo(sox - srw * 0.1, soy - srh * 0.3, sox - srw * 0.5, soy - srh * 0.4);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.strokeStyle = 'rgba(50,40,20,0.3)';
+            ctx.lineWidth = 0.3;
+            ctx.beginPath();
+            ctx.moveTo(sox - srw * 0.3, soy - srh * 0.2);
+            ctx.lineTo(sox + srw * 0.1, soy + srh * 0.1);
+            ctx.stroke();
+            if (si % 2 === 0) {
+                ctx.beginPath();
+                ctx.moveTo(sox + srw * 0.2, soy - srh * 0.5);
+                ctx.lineTo(sox + srw * 0.4, soy - srh * 0.1);
+                ctx.stroke();
+            }
+        }
     }
 
     for (var cri = 0; cri < this.objects.length; cri++) {
         var crn = this.objects[cri];
         if (crn.type !== 'cairn') continue;
-        var crx = mapX + (crn.x / TWB.TILE) * sx;
-        var cry = mapY + (crn.y / TWB.TILE) * sy;
+        var crh2 = TWB.hash(Math.floor(crn.x) * 13, Math.floor(crn.y) * 17);
+        var crx2 = mapX + (crn.x / TWB.TILE) * sx + ((crh2 % 21) - 10) * sx;
+        var cry2 = mapY + (crn.y / TWB.TILE) * sy + (((crh2 >>> 8) % 21) - 10) * sy;
         ctx.fillStyle = '#706050';
-        ctx.beginPath();
-        ctx.arc(crx, cry, 2, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.beginPath(); ctx.ellipse(crx2, cry2 + 1, 2.5, 1.5, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#807060';
+        ctx.beginPath(); ctx.ellipse(crx2, cry2 - 0.5, 2, 1.2, 0, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = '#908070';
-        ctx.fillRect(crx - 0.5, cry - 2, 1, 1.5);
+        ctx.beginPath(); ctx.ellipse(crx2, cry2 - 1.8, 1.2, 0.8, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = ink;
+        ctx.lineWidth = 0.3;
+        ctx.beginPath(); ctx.ellipse(crx2, cry2 + 1, 2.5, 1.5, 0, 0, Math.PI * 2); ctx.stroke();
     }
 
     for (var sri = 0; sri < this.objects.length; sri++) {
         var sro = this.objects[sri];
         if (sro.type !== 'shrine') continue;
-        var srx = mapX + (sro.x / TWB.TILE) * sx;
-        var sry = mapY + (sro.y / TWB.TILE) * sy;
-        ctx.fillStyle = '#807060';
-        ctx.fillRect(srx - 1, sry - 3, 2, 4);
-        ctx.fillRect(srx - 2, sry - 1, 4, 1);
+        var srh2 = TWB.hash(Math.floor(sro.x) * 13, Math.floor(sro.y) * 17);
+        var srx2 = mapX + (sro.x / TWB.TILE) * sx + ((srh2 % 21) - 10) * sx;
+        var sry2 = mapY + (sro.y / TWB.TILE) * sy + (((srh2 >>> 8) % 21) - 10) * sy;
+        ctx.fillStyle = '#6a5a40';
+        ctx.fillRect(srx2 - 1.5, sry2 - 5, 3, 6);
+        ctx.fillRect(srx2 - 3, sry2 - 5, 6, 1.5);
+        ctx.strokeStyle = ink;
+        ctx.lineWidth = 0.4;
+        ctx.strokeRect(srx2 - 1.5, sry2 - 5, 3, 6);
+        ctx.fillStyle = '#8a7a58';
+        ctx.fillRect(srx2 - 0.5, sry2 - 3.5, 1, 2);
     }
 
     for (var bmi = 0; bmi < this.objects.length; bmi++) {
         var bmo = this.objects[bmi];
         if (bmo.type !== 'bridge' && bmo.type !== 'broken_bridge' && bmo.type !== 'stepping_stones') continue;
-        var bmx = mapX + (bmo.x / TWB.TILE) * sx;
-        var bmy = mapY + (bmo.y / TWB.TILE) * sy;
+        var bmh = TWB.hash(Math.floor(bmo.x) * 13, Math.floor(bmo.y) * 17);
+        var bmx = mapX + (bmo.x / TWB.TILE) * sx + ((bmh % 15) - 7) * sx;
+        var bmy = mapY + (bmo.y / TWB.TILE) * sy + (((bmh >>> 8) % 15) - 7) * sy;
         if (bmo.type === 'bridge') {
-            ctx.fillStyle = '#5a4a30';
-            ctx.fillRect(bmx - 3, bmy - 1, 6, 2);
+            ctx.strokeStyle = '#6a5030';
+            ctx.lineWidth = 0.8;
+            ctx.beginPath(); ctx.moveTo(bmx - 6, bmy - 2.5); ctx.lineTo(bmx + 6, bmy - 2.5); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(bmx - 6, bmy + 2.5); ctx.lineTo(bmx + 6, bmy + 2.5); ctx.stroke();
+            ctx.fillStyle = '#8a7040';
+            ctx.strokeStyle = '#5a4020';
+            ctx.lineWidth = 0.4;
+            for (var pl = 0; pl < 5; pl++) {
+                var plx = bmx - 5 + pl * 2.5;
+                ctx.fillRect(plx, bmy - 2, 2, 4);
+                ctx.strokeRect(plx, bmy - 2, 2, 4);
+            }
         } else if (bmo.type === 'broken_bridge') {
-            ctx.fillStyle = '#8a3020';
-            ctx.fillRect(bmx - 3, bmy - 1, 2, 2);
-            ctx.fillRect(bmx + 1, bmy - 1, 2, 2);
+            ctx.fillStyle = '#7a5030';
+            ctx.fillRect(bmx - 6, bmy - 2, 4, 4);
+            ctx.fillRect(bmx + 2, bmy - 2, 4, 4);
+            ctx.strokeStyle = red;
+            ctx.lineWidth = 0.5;
+            ctx.strokeRect(bmx - 6, bmy - 2, 4, 4);
+            ctx.strokeRect(bmx + 2, bmy - 2, 4, 4);
         } else {
-            ctx.fillStyle = '#6a6050';
-            for (var bsi = 0; bsi < 3; bsi++) {
-                ctx.fillRect(bmx - 1 + bsi * 2 - 2, bmy - 1 + bsi, 2, 1);
+            ctx.fillStyle = '#7a7060';
+            for (var bsi = 0; bsi < 4; bsi++) {
+                ctx.beginPath();
+                ctx.ellipse(bmx - 3 + bsi * 2.5, bmy, 1.2, 0.8, 0, 0, Math.PI * 2);
+                ctx.fill();
             }
         }
     }
 
-    for (var ci = 0; ci < TWB._cabinData.length; ci++) {
-        var c = TWB._cabinData[ci];
-        var cx = mapX + c.cx * sx, cy = mapY + c.cy * sy;
-        ctx.fillStyle = ink;
-        ctx.fillRect(cx - 2.5, cy - 2.5, 5, 5);
+    for (var ci3 = 0; ci3 < TWB._cabinData.length; ci3++) {
+        var c = TWB._cabinData[ci3];
+        var ch1 = TWB.hash(ci3 * 37, 7777);
+        var coffX = ((ch1 % 31) - 15) * sx;
+        var coffY = (((ch1 >>> 8) % 31) - 15) * sy;
+        var cx = mapX + c.cx * sx + coffX, cy = mapY + c.cy * sy + coffY;
+        var cStyle = ch1 % 3;
+
+        var wallW = 9, wallH = 6;
+        var wallCol = cStyle === 0 ? '#8a7050' : cStyle === 1 ? '#7a6545' : '#6a5535';
+        ctx.fillStyle = wallCol;
+        ctx.fillRect(cx - wallW / 2, cy - 1, wallW, wallH);
+
+        ctx.strokeStyle = 'rgba(60,40,20,0.3)';
+        ctx.lineWidth = 0.3;
+        for (var wp = 0; wp < 4; wp++) {
+            var wpx = cx - wallW / 2 + 1 + wp * 2.2;
+            ctx.beginPath(); ctx.moveTo(wpx, cy - 1); ctx.lineTo(wpx, cy + wallH - 1); ctx.stroke();
+        }
+
+        ctx.strokeStyle = ink;
+        ctx.lineWidth = 0.5;
+        ctx.strokeRect(cx - wallW / 2, cy - 1, wallW, wallH);
+
+        var roofCol = cStyle === 0 ? '#9a5535' : cStyle === 1 ? '#8a6a3a' : '#7a5530';
+        ctx.fillStyle = roofCol;
+        ctx.beginPath();
+        ctx.moveTo(cx - wallW / 2 - 2, cy - 1);
+        ctx.lineTo(cx, cy - 7);
+        ctx.lineTo(cx + wallW / 2 + 2, cy - 1);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = ink;
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+
+        ctx.strokeStyle = 'rgba(60,40,20,0.25)';
+        ctx.lineWidth = 0.3;
+        for (var rl = 0; rl < 3; rl++) {
+            var rly = cy - 2 - rl * 1.5;
+            var rlw = (wallW / 2 + 2) * (1 - (rl + 1) * 0.25);
+            ctx.beginPath(); ctx.moveTo(cx - rlw, rly); ctx.lineTo(cx + rlw, rly); ctx.stroke();
+        }
+
+        ctx.fillStyle = '#2a1a0a';
+        ctx.fillRect(cx - 1, cy + wallH - 4, 2.5, 3);
+
+        if (cStyle !== 2) {
+            ctx.fillStyle = '#c8d8e0';
+            ctx.fillRect(cx + 2.5, cy, 2, 2);
+            ctx.strokeStyle = ink;
+            ctx.lineWidth = 0.3;
+            ctx.strokeRect(cx + 2.5, cy, 2, 2);
+            ctx.beginPath(); ctx.moveTo(cx + 3.5, cy); ctx.lineTo(cx + 3.5, cy + 2); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(cx + 2.5, cy + 1); ctx.lineTo(cx + 4.5, cy + 1); ctx.stroke();
+        }
     }
 
     var sc = TWB._cabinData[TWB._startCabin];
-    var scx = mapX + sc.cx * sx, scy = mapY + sc.cy * sy;
+    var sch = TWB.hash(TWB._startCabin * 37, 7777);
+    var scOffX = ((sch % 31) - 15) * sx;
+    var scOffY = (((sch >>> 8) % 31) - 15) * sy;
+    var scx = mapX + sc.cx * sx + scOffX, scy = mapY + sc.cy * sy + scOffY;
     ctx.save();
-    ctx.translate(scx, scy - 10);
-    ctx.rotate(-0.06);
-    ctx.font = 'italic 9px Georgia, "Times New Roman", serif';
+    ctx.translate(scx, scy - 16);
+    ctx.rotate(-0.04);
+    ctx.font = 'italic 8px Georgia, "Times New Roman", serif';
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#2a1a08';
+    ctx.fillStyle = ink;
     ctx.fillText('You are here', 0, 0);
     ctx.restore();
-    ctx.strokeStyle = '#2a1a08';
-    ctx.lineWidth = 0.8;
+
+    ctx.fillStyle = ink;
     ctx.beginPath();
-    ctx.moveTo(scx - 2, scy - 6);
-    ctx.lineTo(scx, scy - 3);
-    ctx.lineTo(scx + 2, scy - 6);
-    ctx.stroke();
+    ctx.arc(scx, scy - 10, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#c8a860';
+    ctx.beginPath();
+    ctx.arc(scx, scy - 10, 1.5, 0, Math.PI * 2);
+    ctx.fill();
 
     if (TWB._targetCabin >= 0) {
         var tc = TWB._cabinData[TWB._targetCabin];
-        var tcx = mapX + tc.cx * sx, tcy = mapY + tc.cy * sy;
-        ctx.strokeStyle = '#2a1a08';
-        ctx.lineWidth = 1.3;
+        var tch = TWB.hash(TWB._targetCabin * 37, 7777);
+        var tcOffX = ((tch % 31) - 15) * sx;
+        var tcOffY = (((tch >>> 8) % 31) - 15) * sy;
+        var tcx = mapX + tc.cx * sx + tcOffX, tcy = mapY + tc.cy * sy + tcOffY;
+        ctx.strokeStyle = red;
+        ctx.lineWidth = 1.5;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         ctx.beginPath();
-        var nPts = 28;
+        var nPts = 32;
         for (var pi = 0; pi <= nPts; pi++) {
             var ang = (pi / nPts) * Math.PI * 2 - 0.3;
-            var wobble = Math.sin(pi * 1.7) * 1.8 + Math.cos(pi * 2.9) * 1.2;
-            var rr = 9 + wobble;
-            var px = tcx + Math.cos(ang) * rr;
-            var py = tcy + Math.sin(ang) * rr;
-            if (pi === 0) ctx.moveTo(px, py);
-            else ctx.lineTo(px, py);
+            var wobble = Math.sin(pi * 1.7) * 2 + Math.cos(pi * 2.9) * 1.4;
+            var rr2 = 12 + wobble;
+            var ptx = tcx + Math.cos(ang) * rr2;
+            var pty = tcy + Math.sin(ang) * rr2;
+            if (pi === 0) ctx.moveTo(ptx, pty);
+            else ctx.lineTo(ptx, pty);
         }
         ctx.stroke();
     }
 
-    var crx = mapX + mapW - 40, cry = mapY + mapH - 40, crs = 18;
+    var crx = mapX + mapW - 42, cry3 = mapY + mapH - 42, crs = 20;
+    ctx.fillStyle = 'rgba(226,212,176,0.8)';
+    ctx.beginPath(); ctx.arc(crx, cry3, crs + 8, 0, Math.PI * 2); ctx.fill();
+
     ctx.strokeStyle = ink;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.arc(crx, cry, crs, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(crx, cry, crs + 3, 0, Math.PI * 2);
-    ctx.stroke();
+    ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.arc(crx, cry3, crs + 3, 0, Math.PI * 2); ctx.stroke();
+    ctx.lineWidth = 0.6;
+    ctx.beginPath(); ctx.arc(crx, cry3, crs + 5, 0, Math.PI * 2); ctx.stroke();
+
     ctx.fillStyle = ink;
-    ctx.beginPath();
-    ctx.arc(crx, cry, 2, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(crx, cry3, 2, 0, Math.PI * 2); ctx.fill();
 
     var mainA = [-Math.PI / 2, 0, Math.PI / 2, Math.PI];
     for (var i = 0; i < 4; i++) {
         var a = mainA[i];
-        var len = (i === 0) ? crs + 6 : crs;
-        ctx.fillStyle = (i % 2 === 0) ? ink : inkL;
+        var len = crs + 1;
+        ctx.fillStyle = ink;
         ctx.beginPath();
-        ctx.moveTo(crx + Math.cos(a) * len, cry + Math.sin(a) * len);
-        ctx.lineTo(crx + Math.cos(a - 0.3) * crs * 0.2, cry + Math.sin(a - 0.3) * crs * 0.2);
-        ctx.lineTo(crx + Math.cos(a + 0.3) * crs * 0.2, cry + Math.sin(a + 0.3) * crs * 0.2);
+        ctx.moveTo(crx + Math.cos(a) * len, cry3 + Math.sin(a) * len);
+        ctx.lineTo(crx + Math.cos(a - 0.22) * 3, cry3 + Math.sin(a - 0.22) * 3);
+        ctx.lineTo(crx, cry3);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = inkL;
+        ctx.beginPath();
+        ctx.moveTo(crx + Math.cos(a) * len, cry3 + Math.sin(a) * len);
+        ctx.lineTo(crx + Math.cos(a + 0.22) * 3, cry3 + Math.sin(a + 0.22) * 3);
+        ctx.lineTo(crx, cry3);
         ctx.closePath();
         ctx.fill();
     }
     var secA = [-Math.PI / 4, Math.PI / 4, 3 * Math.PI / 4, -3 * Math.PI / 4];
     for (var i = 0; i < 4; i++) {
         var a = secA[i];
-        ctx.fillStyle = (i % 2 === 0) ? inkL : ink;
+        ctx.fillStyle = inkL;
         ctx.beginPath();
-        ctx.moveTo(crx + Math.cos(a) * crs * 0.55, cry + Math.sin(a) * crs * 0.55);
-        ctx.lineTo(crx + Math.cos(a - 0.35) * crs * 0.15, cry + Math.sin(a - 0.35) * crs * 0.15);
-        ctx.lineTo(crx + Math.cos(a + 0.35) * crs * 0.15, cry + Math.sin(a + 0.35) * crs * 0.15);
+        ctx.moveTo(crx + Math.cos(a) * crs * 0.5, cry3 + Math.sin(a) * crs * 0.5);
+        ctx.lineTo(crx + Math.cos(a - 0.3) * 2, cry3 + Math.sin(a - 0.3) * 2);
+        ctx.lineTo(crx + Math.cos(a + 0.3) * 2, cry3 + Math.sin(a + 0.3) * 2);
         ctx.closePath();
         ctx.fill();
     }
-    ctx.font = '6px "Press Start 2P", monospace';
+
+    ctx.font = 'bold 7px Georgia, serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = ink;
+    ctx.fillText('N', crx, cry3 - crs - 8);
+    ctx.font = '5px Georgia, serif';
+    ctx.fillText('S', crx, cry3 + crs + 8);
+    ctx.fillText('E', crx + crs + 8, cry3);
+    ctx.fillText('W', crx - crs - 8, cry3);
+    ctx.textBaseline = 'alphabetic';
+
+    ctx.font = 'bold 10px Georgia, "Times New Roman", serif';
     ctx.textAlign = 'center';
     ctx.fillStyle = ink;
-    ctx.fillText('N', crx, cry - crs - 8);
+    ctx.fillText('THE WAY BACK', cw / 2, pad - 4);
 
-    var serpX = mapX + mapW - 100, serpY = mapY + 22;
-    ctx.strokeStyle = '#9a8a68';
-    ctx.lineWidth = 1.5;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.arc(serpX - 3, serpY + 2, 3, Math.PI, 0, true);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(serpX, serpY);
-    for (var si = 1; si <= 28; si++) {
-        ctx.lineTo(serpX + si * 1.8, serpY + Math.sin(si * 0.35) * 5);
-    }
-    ctx.stroke();
-    var hx = serpX + 28 * 1.8, hy = serpY + Math.sin(28 * 0.35) * 5;
-    ctx.fillStyle = '#9a8a68';
-    ctx.beginPath();
-    ctx.moveTo(hx, hy);
-    ctx.lineTo(hx + 6, hy - 3);
-    ctx.lineTo(hx + 4, hy + 3);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = ink;
-    ctx.beginPath();
-    ctx.arc(hx + 3, hy - 1, 0.7, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = red;
-    ctx.lineWidth = 0.5;
-    ctx.beginPath();
-    ctx.moveTo(hx + 6, hy - 1.5);
-    ctx.lineTo(hx + 9, hy - 3);
-    ctx.moveTo(hx + 6, hy - 1.5);
-    ctx.lineTo(hx + 9, hy);
-    ctx.stroke();
-    ctx.strokeStyle = '#9a8a68';
-    ctx.lineWidth = 0.8;
-    var wingX = serpX + 16, wingY = serpY + Math.sin(9 * 0.35) * 5;
-    ctx.beginPath();
-    ctx.moveTo(wingX, wingY);
-    ctx.quadraticCurveTo(wingX + 3, wingY - 10, wingX + 8, wingY - 5);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(wingX + 8, wingY - 5);
-    ctx.quadraticCurveTo(wingX + 5, wingY - 3, wingX + 2, wingY);
-    ctx.stroke();
-
-    ctx.font = '8px "Press Start 2P", monospace';
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#6a5030';
-    ctx.fillText('THE WAY BACK', cw / 2, pad - 6);
     ctx.font = '6px "Press Start 2P", monospace';
     ctx.fillStyle = inkL;
     ctx.fillText('[M] Close', cw / 2, ch - pad + 14);
@@ -3541,6 +5177,8 @@ TWB.Game.prototype.drawBackpack = function() {
     ctx.strokeStyle = '#d4a44a';
     ctx.strokeRect(l.px - 1, l.py - 1, l.pw + 2, l.ph + 2);
 
+    this.drawCloseBtn(l.px + l.pw - 20, l.py + 6);
+
     ctx.font = '10px "Press Start 2P", monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
@@ -3551,7 +5189,7 @@ TWB.Game.prototype.drawBackpack = function() {
     ctx.fillStyle = '#606068';
     var used = 0;
     for (var c = 0; c < this.backpack.length; c++) { if (this.backpack[c]) used++; }
-    ctx.fillText(used + '/10 slots · Tab to close', l.px + l.pw / 2, l.py + 28);
+    ctx.fillText(used + '/10 slots', l.px + l.pw / 2, l.py + 28);
 
     for (var i = 0; i < this.backpack.length; i++) {
         var col = i % l.cols;
@@ -3573,10 +5211,21 @@ TWB.Game.prototype.drawBackpack = function() {
             ctx.fillStyle = '#c0c0c8';
             ctx.fillText(slot.count.toString(), bx + l.slotSize / 2, by + 12);
 
-            ctx.font = '8px "Press Start 2P", monospace';
             ctx.fillStyle = '#8a8a92';
             var label = TWB.ITEM_LABELS[slot.type] || slot.type;
-            ctx.fillText(label, bx + l.slotSize / 2, by + 30);
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(bx + 1, by + 1, l.slotSize - 2, l.slotSize - 2);
+            ctx.clip();
+            ctx.font = '6px "Press Start 2P", monospace';
+            var words = label.split(' ');
+            if (words.length > 1) {
+                ctx.fillText(words[0], bx + l.slotSize / 2, by + 28);
+                ctx.fillText(words.slice(1).join(' '), bx + l.slotSize / 2, by + 38);
+            } else {
+                ctx.fillText(label, bx + l.slotSize / 2, by + 33);
+            }
+            ctx.restore();
         } else {
             ctx.font = '8px "Press Start 2P", monospace';
             ctx.fillStyle = '#222230';
@@ -4205,28 +5854,55 @@ TWB.Game.prototype.drawHUD = function() {
     ctx.fillRect(500, hudY + 5, 1, hudH - 10);
 
     var faceD = TWB.Resources.face_dog;
-    if (faceD) {
-        var fdH = Math.floor(faceD.height * (60 / faceD.width));
-        ctx.drawImage(faceD, 506, hudY + 10, 60, fdH);
-    }
-    ctx.font = '8px "Press Start 2P", monospace';
-    ctx.fillStyle = '#d4a44a';
-    var wx = 572;
-    ctx.fillText(this.dogName || 'WOLF', wx, hudY + 5);
-    this.drawBar(ctx, wx, hudY + 17, 70, 6, ws.health, '#4a1010', '#b83030');
-    this.drawBar(ctx, wx, hudY + 27, 70, 6, ws.energy, '#0a3a18', '#20a040');
-    this.drawBar(ctx, wx, hudY + 37, 70, 6, ws.hunger, '#3a2a08', '#c08820');
-    this.drawBar(ctx, wx, hudY + 47, 70, 6, ws.thirst, '#0a2a3a', '#2080c0');
-    ctx.font = '8px "Press Start 2P", monospace';
-    ctx.fillStyle = '#888';
-    ctx.fillText('HP', wx + 73, hudY + 17);
-    ctx.fillText('EN', wx + 73, hudY + 27);
-    ctx.fillText('HU', wx + 73, hudY + 37);
-    ctx.fillText('TH', wx + 73, hudY + 47);
+    if (this.dogStolen) {
+        if (faceD) {
+            ctx.save();
+            ctx.globalAlpha = 0.3;
+            var fdH2 = Math.floor(faceD.height * (60 / faceD.width));
+            ctx.drawImage(faceD, 506, hudY + 10, 60, fdH2);
+            ctx.restore();
+        }
+        ctx.font = '8px "Press Start 2P", monospace';
+        ctx.fillStyle = '#a03030';
+        ctx.fillText(this.dogName || 'WOLF', 572, hudY + 5);
+        ctx.fillStyle = '#802020';
+        ctx.fillText('MISSING', 572, hudY + 22);
+        if (this.questRevealed) {
+            ctx.fillStyle = '#c08820';
+            ctx.fillText('LOCATION KNOWN', 572, hudY + 36);
+        } else {
+            ctx.fillStyle = '#606068';
+            ctx.fillText('Shrines: ' + this.questShrinesLit + '/3', 572, hudY + 36);
+        }
+        var qTimeLeft = Math.max(0, this.questTimerMax - this.questTimer);
+        var qHours = Math.floor(qTimeLeft / 3600);
+        var qMins = Math.floor((qTimeLeft % 3600) / 60);
+        ctx.fillStyle = qHours < 12 ? '#a03030' : '#c08820';
+        ctx.fillText(qHours + 'h ' + qMins + 'm left', 572, hudY + 50);
+    } else {
+        if (faceD) {
+            var fdH = Math.floor(faceD.height * (60 / faceD.width));
+            ctx.drawImage(faceD, 506, hudY + 10, 60, fdH);
+        }
+        ctx.font = '8px "Press Start 2P", monospace';
+        ctx.fillStyle = '#d4a44a';
+        var wx = 572;
+        ctx.fillText(this.dogName || 'WOLF', wx, hudY + 5);
+        this.drawBar(ctx, wx, hudY + 17, 70, 6, ws.health, '#4a1010', '#b83030');
+        this.drawBar(ctx, wx, hudY + 27, 70, 6, ws.energy, '#0a3a18', '#20a040');
+        this.drawBar(ctx, wx, hudY + 37, 70, 6, ws.hunger, '#3a2a08', '#c08820');
+        this.drawBar(ctx, wx, hudY + 47, 70, 6, ws.thirst, '#0a2a3a', '#2080c0');
+        ctx.font = '8px "Press Start 2P", monospace';
+        ctx.fillStyle = '#888';
+        ctx.fillText('HP', wx + 73, hudY + 17);
+        ctx.fillText('EN', wx + 73, hudY + 27);
+        ctx.fillText('HU', wx + 73, hudY + 37);
+        ctx.fillText('TH', wx + 73, hudY + 47);
 
-    var moodColor = ws.mood === 'Happy' ? '#50c050' : ws.mood === 'Loyal' ? '#60a060' : ws.mood === 'Hungry' ? '#c08820' : ws.mood === 'Tired' ? '#a0a040' : '#a04040';
-    ctx.fillStyle = moodColor;
-    ctx.fillText('Mood: ' + ws.mood, wx, hudY + 60);
+        var moodColor = ws.mood === 'Happy' ? '#50c050' : ws.mood === 'Loyal' ? '#60a060' : ws.mood === 'Hungry' ? '#c08820' : ws.mood === 'Tired' ? '#a0a040' : '#a04040';
+        ctx.fillStyle = moodColor;
+        ctx.fillText('Mood: ' + ws.mood, wx, hudY + 60);
+    }
 
     ctx.fillStyle = '#3a3a4a';
     ctx.fillRect(660, hudY + 5, 1, hudH - 10);

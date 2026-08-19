@@ -19,6 +19,9 @@ TWB.T_WATER_DEEP = 5;
 TWB.T_SHORE = 6;
 TWB.T_FLOOR = 7;
 TWB.T_WALL = 8;
+TWB.T_SNOW1 = 9;
+TWB.T_SNOW2 = 10;
+TWB.T_SNOW_DIRT = 11;
 
 TWB.INTERIOR_COLS = 12;
 TWB.INTERIOR_ROWS = 10;
@@ -45,6 +48,7 @@ TWB.hash = function(x, y) {
 TWB._riverParams = null;
 TWB._tributaries = [];
 TWB._cabinData = [];
+TWB._lakeData = [];
 TWB._startCabin = 0;
 TWB._targetCabin = -1;
 
@@ -150,6 +154,61 @@ TWB.isOnTributary = function(tx, ty) {
     return false;
 };
 
+TWB.generateLakes = function() {
+    TWB._lakeData = [];
+    var numLakes = 5 + (TWB.hash(11000, 11000) % 4);
+    for (var i = 0; i < numLakes; i++) {
+        var h1 = TWB.hash(i * 47 + 200, 12000);
+        var h2 = TWB.hash(12000, i * 47 + 200);
+        var cx = 35 + ((h1 >>> 4) % (TWB.COLS - 70));
+        var cy = 35 + ((h2 >>> 4) % (TWB.ROWS - 70));
+        var rc = TWB.getRiverCenter(cy);
+        if (Math.abs(cx - rc) < 18) continue;
+        var r = TWB._riverParams;
+        if (r && cy > r.r2startY && cy < r.r2endY) {
+            var rc2 = TWB.getSecondRiver(cy);
+            if (Math.abs(cx - rc2) < 18) continue;
+        }
+        var skip = false;
+        for (var j = 0; j < TWB._cabinData.length; j++) {
+            var c = TWB._cabinData[j];
+            if (Math.abs(cx - c.cx) < 16 && Math.abs(cy - c.cy) < 16) { skip = true; break; }
+        }
+        if (skip) continue;
+        for (var j = 0; j < TWB._lakeData.length; j++) {
+            var l = TWB._lakeData[j];
+            if (Math.abs(cx - l.cx) < 28 && Math.abs(cy - l.cy) < 28) { skip = true; break; }
+        }
+        if (skip) continue;
+        var h3 = TWB.hash(i * 53 + 300, 12100);
+        var h4 = TWB.hash(12100, i * 53 + 300);
+        var rx = 4 + (h3 % 5);
+        var ry = 3 + (h4 % 4);
+        var rot = (TWB.hash(i * 59, 12200) % 628) / 100.0;
+        TWB._lakeData.push({ cx: cx, cy: cy, rx: rx, ry: ry, rot: rot });
+    }
+};
+
+TWB.isOnLake = function(tx, ty) {
+    for (var i = 0; i < TWB._lakeData.length; i++) {
+        var l = TWB._lakeData[i];
+        var dx = tx - l.cx;
+        var dy = ty - l.cy;
+        var cos = Math.cos(l.rot);
+        var sin = Math.sin(l.rot);
+        var rdx = dx * cos + dy * sin;
+        var rdy = -dx * sin + dy * cos;
+        var dist = (rdx * rdx) / (l.rx * l.rx) + (rdy * rdy) / (l.ry * l.ry);
+        var noise = (TWB.hash(tx * 7 + i * 100, ty * 7) % 100) / 250.0;
+        if (dist < 0.6 + noise) {
+            if (dist < 0.35) return TWB.T_WATER_DEEP;
+            return TWB.T_WATER;
+        }
+        if (dist < 1.0 + noise * 0.6) return TWB.T_SHORE;
+    }
+    return 0;
+};
+
 TWB.getGround = function(tx, ty) {
     if (tx < 0 || ty < 0 || tx >= TWB.COLS || ty >= TWB.ROWS) return TWB.T_GRASS1;
 
@@ -168,13 +227,31 @@ TWB.getGround = function(tx, ty) {
 
     if (TWB._tributaries.length > 0 && TWB.isOnTributary(tx, ty)) return TWB.T_WATER;
 
-    for (var i = 0; i < TWB._cabinData.length; i++) {
-        var c = TWB._cabinData[i];
-        if (tx >= c.cx - 5 && tx <= c.cx + 5 && ty >= c.cy - 4 && ty <= c.cy + 4) return TWB.T_DIRT;
-        if (tx >= c.cx - 2 && tx <= c.cx + 2 && ty >= c.cy + 4 && ty <= c.cy + 10) return TWB.T_DIRT;
+    if (TWB._lakeData.length > 0) {
+        var lakeT = TWB.isOnLake(tx, ty);
+        if (lakeT) return lakeT;
     }
 
+    for (var i = 0; i < TWB._cabinData.length; i++) {
+        var c = TWB._cabinData[i];
+        if (tx >= c.cx - 5 && tx <= c.cx + 5 && ty >= c.cy - 4 && ty <= c.cy + 4) {
+            return TWB.getSnowLevel(tx, ty) > 0 ? TWB.T_SNOW_DIRT : TWB.T_DIRT;
+        }
+        if (tx >= c.cx - 2 && tx <= c.cx + 2 && ty >= c.cy + 4 && ty <= c.cy + 10) {
+            return TWB.getSnowLevel(tx, ty) > 0 ? TWB.T_SNOW_DIRT : TWB.T_DIRT;
+        }
+    }
+
+    var snowLvl = TWB.getSnowLevel(tx, ty);
+
     var h = TWB.hash(tx, ty) % 100;
+    if (snowLvl === 2) return (h < 60) ? TWB.T_SNOW1 : TWB.T_SNOW2;
+    if (snowLvl === 1) {
+        if (h < 40) return TWB.T_SNOW1;
+        if (h < 65) return TWB.T_GRASS1;
+        return TWB.T_GRASS2;
+    }
+
     if (h < 55) return TWB.T_GRASS1;
     if (h < 82) return TWB.T_GRASS2;
     return TWB.T_GRASS3;
@@ -401,10 +478,45 @@ TWB.generateCabins = function() {
     }
 };
 
+TWB._snowZones = [];
+
+TWB.generateSnowZones = function() {
+    TWB._snowZones = [];
+    var count = 4 + TWB.hash(777, 888) % 4;
+    for (var i = 0; i < count; i++) {
+        var cx = 40 + TWB.hash(i * 53, 9001) % (TWB.COLS - 80);
+        var cy = 40 + TWB.hash(9001, i * 53) % (TWB.ROWS - 80);
+        var rx = 15 + TWB.hash(i * 37, 9002) % 25;
+        var ry = 12 + TWB.hash(9002, i * 37) % 20;
+        var ok = true;
+        for (var j = 0; j < TWB._snowZones.length; j++) {
+            var s = TWB._snowZones[j];
+            var ddx = cx - s.cx, ddy = cy - s.cy;
+            if (Math.sqrt(ddx * ddx + ddy * ddy) < (rx + s.rx) * 0.6) { ok = false; break; }
+        }
+        if (!ok) continue;
+        TWB._snowZones.push({ cx: cx, cy: cy, rx: rx, ry: ry });
+    }
+};
+
+TWB.getSnowLevel = function(tx, ty) {
+    for (var i = 0; i < TWB._snowZones.length; i++) {
+        var s = TWB._snowZones[i];
+        var dx = (tx - s.cx) / s.rx;
+        var dy = (ty - s.cy) / s.ry;
+        var dist = dx * dx + dy * dy;
+        if (dist < 0.6) return 2;
+        if (dist < 1.0) return 1;
+    }
+    return 0;
+};
+
 TWB.initWorld = function() {
     TWB.initRivers();
     TWB.generateTributaries();
     TWB.generateCabins();
+    TWB.generateLakes();
+    TWB.generateSnowZones();
 };
 
 // === OBJECT GENERATION ===
@@ -574,6 +686,21 @@ TWB.generateObjects = function() {
         var bux = 8 + Math.floor(TWB.hash(bui * 13, 600) % (TWB.COLS - 16));
         var buy = 8 + Math.floor(TWB.hash(600, bui * 13) % (TWB.ROWS - 16));
         objs.push({ type: 'bush', x: bux * TWB.TILE, y: buy * TWB.TILE, solid: false });
+    }
+
+    for (var li = 0; li < TWB._lakeData.length; li++) {
+        var lake = TWB._lakeData[li];
+        var herbCount = 2 + (TWB.hash(li * 61, 13000) % 3);
+        for (var hi = 0; hi < herbCount; hi++) {
+            var hAngle = (TWB.hash(li * 17 + hi * 31, 13100) % 628) / 100.0;
+            var hDist = lake.rx + 2 + (TWB.hash(13200, li * 19 + hi * 37) % 3);
+            var hx = Math.round(lake.cx + Math.cos(hAngle) * hDist);
+            var hy = Math.round(lake.cy + Math.sin(hAngle) * hDist);
+            if (hx < 5 || hy < 5 || hx >= TWB.COLS - 5 || hy >= TWB.ROWS - 5) continue;
+            var hg = TWB.getGround(hx, hy);
+            if (hg === TWB.T_WATER || hg === TWB.T_WATER_DEEP || hg === TWB.T_SHORE) continue;
+            objs.push({ type: 'herb_vikos', x: hx * TWB.TILE, y: hy * TWB.TILE, solid: false, picked: false });
+        }
     }
 
     return objs;

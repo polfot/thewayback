@@ -14,17 +14,37 @@
         <label for="dog-name">DOG'S NAME</label>
         <input type="text" id="dog-name" maxlength="12" placeholder="Rex">
         <div class="error-msg" id="name-error"></div>
+        <div id="difficulty-select">
+            <button class="diff-btn" data-diff="0">HIKERS</button>
+            <button class="diff-btn selected" data-diff="1">MOUNTAINEERS</button>
+            <button class="diff-btn" data-diff="2">THE MISTS</button>
+        </div>
+        <div id="diff-desc">Balanced survival experience</div>
         <button id="start-btn">START</button>
+        <button id="tutorial-btn">TUTORIAL</button>
+    </div>
+
+    <div id="tutorial-overlay" style="display:none;">
+        <div id="tutorial-box">
+            <div id="tutorial-title"></div>
+            <div id="tutorial-body"></div>
+            <div id="tutorial-nav">
+                <button id="tut-prev" class="tut-nav-btn">PREV</button>
+                <span id="tut-page"></span>
+                <button id="tut-next" class="tut-nav-btn">NEXT</button>
+            </div>
+            <button id="tut-close">CLOSE</button>
+        </div>
     </div>
 
     <div id="game-wrapper" style="display:none;">
         <canvas id="game-canvas" width="800" height="520"></canvas>
     </div>
 
-    <script src="js/data.js?v=28"></script>
-    <script src="js/loader.js?v=28"></script>
-    <script src="js/sprites.js?v=28"></script>
-    <script src="js/game.js?v=28"></script>
-    <script src="js/main.js?v=28"></script>
+    <script src="js/data.js?v=52"></script>
+    <script src="js/loader.js?v=52"></script>
+    <script src="js/sprites.js?v=52"></script>
+    <script src="js/game.js?v=52"></script>
+    <script src="js/main.js?v=52"></script>
 </body>
 </html>
