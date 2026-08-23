@@ -269,6 +269,7 @@ TWB.Game = function(canvas) {
     this.snowAccumRate = 0;
 
     this.lastRestTime = -9999;
+    this.lastSleepTime = 0;
     this.starvationTimer = 0;
     this.wolfStarvationTimer = 0;
 
@@ -1437,8 +1438,17 @@ TWB.Game.prototype.executeAction = function(obj, action) {
             }
             break;
         case 'sleep':
+            if (this.lastSleepTime && this.gameTime - this.lastSleepTime < 4 * 3600) {
+                msg = 'Not tired enough to sleep yet...';
+                break;
+            }
+            if (this.shadows && this.shadows.length > 0 && !this.barricaded) {
+                msg = 'Shadows lurk outside! Barricade the door first.';
+                break;
+            }
             if (this.currentCabinIdx === this.cursedCabin) {
                 this.gameTime += 1 * 3600;
+                this.lastSleepTime = this.gameTime;
                 s.hunger = Math.max(0, s.hunger - 5);
                 s.thirst = Math.max(0, s.thirst - 5);
                 msg = 'You woke after an hour... couldn\'t sleep.';
@@ -1453,6 +1463,7 @@ TWB.Game.prototype.executeAction = function(obj, action) {
                 this.wolfStats.thirst = Math.max(0, this.wolfStats.thirst - 20);
                 this.wolfStats.mood = 'Loyal';
                 this.gameTime += 8 * 3600;
+                this.lastSleepTime = this.gameTime;
                 this.fireFuel = Math.max(0, this.fireFuel - 30);
                 this.fireplaceFuel = Math.max(0, this.fireplaceFuel - 30);
                 msg = 'Slept 8 hours...';
