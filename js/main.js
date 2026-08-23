@@ -116,8 +116,12 @@ document.addEventListener('DOMContentLoaded', function() {
             body: 'Rain and snow make you colder and drain your health. Seek shelter when weather turns.\n\nSome areas are covered in snow. Snow zones are colder but may hide rare herbs near frozen lakes.\n\nWind chill makes cold nights even more dangerous.'
         },
         {
+            title: 'YOUR QUEST',
+            body: 'Each game gives you a different quest to complete:\n\nRESCUE - Search cabins for clues about a missing hiker. Find all 3 clues, then reach the target cabin.\n\nRELAY - Collect 3 radio parts (Battery, Antenna, Fuse) from different cabins. Bring them to the relay station.\n\nCURSE - Find 3 ancient shrines in the forest. Light each one and collect the Holy Relic inside. Bring all 3 relics to the cursed cabin.\n\nCheck your objective at the top-left of the screen. Press [M] for the map - quest markers show your progress.'
+        },
+        {
             title: 'TIPS',
-            body: 'Talk to the Elder if you meet one. Their stories may hold useful clues.\n\nThe 3-Leaf Herb grows near lakes. Burn it in a fire for special effects.\n\nFill canteens at rivers to carry water with you.\n\nGood luck finding your way back.'
+            body: 'If you collapse, your dog will drag you to the nearest cabin once.\n\nTalk to the Elder if you meet one. Their stories may hold useful clues.\n\nThe 3-Leaf Herb grows near lakes. Burn it in a fire for special effects.\n\nFill canteens at rivers to carry water with you.\n\nGood luck finding your way back.'
         }
     ];
 

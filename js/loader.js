@@ -4,7 +4,12 @@ TWB.Resources = {};
 
 TWB.RESOURCE_LIST = [
     { name: 'face_human', src: 'resources/face_human.png', tw: 48, ax: 0.5, ay: 0.5 },
-    { name: 'face_dog', src: 'resources/face_dog.png', tw: 48, ax: 0.5, ay: 0.5 }
+    { name: 'face_dog', src: 'resources/face_dog.png', tw: 48, ax: 0.5, ay: 0.5 },
+    { name: 'spr_cabin', src: 'resources/canteen/canteen-house_1.png', tw: 96, ax: 0.5, ay: 0.85 },
+    { name: 'spr_bed', src: 'resources/canteen/canteen-bed-1.png', tw: 40, ax: 0.5, ay: 0.5 },
+    { name: 'spr_door', src: 'resources/canteen/canteen-door-1.png', tw: 24, ax: 0.5, ay: 0.5 },
+    { name: 'spr_table', src: 'resources/canteen/canteen-table-1.png', tw: 32, ax: 0.5, ay: 0.5 },
+    { name: 'spr_cabinet', src: 'resources/canteen/canteen-savespace-1.png', tw: 28, ax: 0.5, ay: 0.5 }
 ];
 
 TWB._imageAnchors = {};

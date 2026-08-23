@@ -23,14 +23,13 @@ TWB.T_SNOW1 = 9;
 TWB.T_SNOW2 = 10;
 TWB.T_SNOW_DIRT = 11;
 
-TWB.INTERIOR_COLS = 12;
-TWB.INTERIOR_ROWS = 10;
+TWB.INTERIOR_COLS = 8;
+TWB.INTERIOR_ROWS = 6;
 
 TWB.indoors = false;
 
 TWB.getInteriorGround = function(tx, ty) {
     if (tx < 0 || ty < 0 || tx >= TWB.INTERIOR_COLS || ty >= TWB.INTERIOR_ROWS) return TWB.T_WALL;
-    if (tx === 0 || tx === TWB.INTERIOR_COLS - 1 || ty === 0 || ty === TWB.INTERIOR_ROWS - 1) return TWB.T_WALL;
     return TWB.T_FLOOR;
 };
 
@@ -51,6 +50,8 @@ TWB._cabinData = [];
 TWB._lakeData = [];
 TWB._startCabin = 0;
 TWB._targetCabin = -1;
+TWB._scenario = 'RESCUE';
+TWB._scenarioData = {};
 
 TWB.initRivers = function() {
     var h1 = TWB.hash(1000, 1000);
@@ -261,7 +262,7 @@ TWB.isWalkable = function(wx, wy) {
     var tx = Math.floor(wx / TWB.TILE);
     var ty = Math.floor(wy / TWB.TILE);
     if (TWB.indoors) {
-        return tx > 0 && ty > 0 && tx < TWB.INTERIOR_COLS - 1 && ty < TWB.INTERIOR_ROWS - 1;
+        return wx >= 8 && wy >= 8 && wx < TWB.INTERIOR_COLS * TWB.TILE - 8 && wy < TWB.INTERIOR_ROWS * TWB.TILE - 8;
     }
     if (tx < 0 || ty < 0 || tx >= TWB.COLS || ty >= TWB.ROWS) return false;
     var t = TWB.getGround(tx, ty);
@@ -277,10 +278,11 @@ TWB.CABIN_TYPES = [
         loot: ['bandage', 'sticks', 'berries'],
         maxSearch: 2,
         interior: [
-            { type: 'fireplace', gx: 3, gy: 2 },
-            { type: 'bed', gx: 9, gy: 2 },
-            { type: 'cabinet', gx: 2, gy: 6 },
-            { type: 'cabin_window', gx: 6, gy: 1 }
+            { type: 'fireplace', gx: 1, gy: 1 },
+            { type: 'bed', gx: 6, gy: 3 },
+            { type: 'cabinet', gx: 1, gy: 3 },
+            { type: 'table', gx: 6, gy: 5 },
+            { type: 'cabin_window', gx: 2, gy: 5 }
         ]
     },
     {
@@ -289,12 +291,12 @@ TWB.CABIN_TYPES = [
         loot: ['meat', 'meat', 'knife', 'trap', 'bandage', 'rope'],
         maxSearch: 3,
         interior: [
-            { type: 'fireplace', gx: 3, gy: 2 },
-            { type: 'bed', gx: 9, gy: 2 },
-            { type: 'table', gx: 6, gy: 4, desc: 'Knife marks cover the surface. Dried blood.' },
-            { type: 'cabinet', gx: 2, gy: 5 },
-            { type: 'note', gx: 7, gy: 3 },
-            { type: 'cabin_window', gx: 6, gy: 1 }
+            { type: 'fireplace', gx: 1, gy: 1 },
+            { type: 'bed', gx: 6, gy: 3 },
+            { type: 'table', gx: 6, gy: 5, desc: 'Knife marks cover the surface. Dried blood.' },
+            { type: 'cabinet', gx: 1, gy: 3 },
+            { type: 'note', gx: 5, gy: 2 },
+            { type: 'cabin_window', gx: 2, gy: 5 }
         ]
     },
     {
@@ -303,12 +305,12 @@ TWB.CABIN_TYPES = [
         loot: ['meat', 'canned_food', 'bandage', 'canteen', 'rope', 'olive_oil'],
         maxSearch: 3,
         interior: [
-            { type: 'fireplace', gx: 3, gy: 2 },
-            { type: 'bed', gx: 9, gy: 2 },
-            { type: 'table', gx: 6, gy: 5, desc: 'A tin cup. Half-empty. A dog bowl on the floor.' },
-            { type: 'shelf', gx: 2, gy: 3 },
-            { type: 'note', gx: 6, gy: 4 },
-            { type: 'cabin_window', gx: 6, gy: 1 }
+            { type: 'fireplace', gx: 1, gy: 1 },
+            { type: 'bed', gx: 6, gy: 3 },
+            { type: 'table', gx: 2, gy: 5, desc: 'A tin cup. Half-empty. A dog bowl on the floor.' },
+            { type: 'shelf', gx: 1, gy: 3 },
+            { type: 'note', gx: 3, gy: 2 },
+            { type: 'cabin_window', gx: 2, gy: 5 }
         ]
     },
     {
@@ -317,12 +319,12 @@ TWB.CABIN_TYPES = [
         loot: ['canned_food', 'canned_food', 'bandage', 'canteen', 'expired_food', 'olive_oil'],
         maxSearch: 3,
         interior: [
-            { type: 'fireplace', gx: 3, gy: 2 },
-            { type: 'bed', gx: 9, gy: 2 },
-            { type: 'bed', gx: 9, gy: 5 },
-            { type: 'cabinet', gx: 2, gy: 5 },
-            { type: 'note', gx: 4, gy: 4 },
-            { type: 'cabin_window', gx: 6, gy: 1 }
+            { type: 'fireplace', gx: 1, gy: 1 },
+            { type: 'bed', gx: 6, gy: 3 },
+            { type: 'bed', gx: 6, gy: 3 },
+            { type: 'cabinet', gx: 1, gy: 3 },
+            { type: 'note', gx: 3, gy: 2 },
+            { type: 'cabin_window', gx: 2, gy: 5 }
         ]
     },
     {
@@ -331,13 +333,13 @@ TWB.CABIN_TYPES = [
         loot: ['bandage', 'bandage', 'canteen', 'canned_food', 'torch'],
         maxSearch: 4,
         interior: [
-            { type: 'fireplace', gx: 3, gy: 2 },
-            { type: 'bed', gx: 9, gy: 2 },
-            { type: 'table', gx: 5, gy: 3, desc: 'An open map. Red circles near the northern ridge.' },
-            { type: 'cabinet', gx: 2, gy: 5 },
-            { type: 'shelf', gx: 9, gy: 5 },
-            { type: 'note', gx: 5, gy: 4 },
-            { type: 'cabin_window', gx: 7, gy: 1 }
+            { type: 'fireplace', gx: 1, gy: 1 },
+            { type: 'bed', gx: 6, gy: 3 },
+            { type: 'table', gx: 2, gy: 4, desc: 'An open map. Red circles near the northern ridge.' },
+            { type: 'cabinet', gx: 1, gy: 3 },
+            { type: 'shelf', gx: 6, gy: 3 },
+            { type: 'note', gx: 4, gy: 3 },
+            { type: 'cabin_window', gx: 2, gy: 5 }
         ]
     },
     {
@@ -346,12 +348,12 @@ TWB.CABIN_TYPES = [
         loot: ['berries', 'berries', 'sticks', 'torch', 'bandage', 'olive_oil'],
         maxSearch: 2,
         interior: [
-            { type: 'fireplace', gx: 9, gy: 2 },
-            { type: 'bed', gx: 2, gy: 2 },
-            { type: 'shelf', gx: 2, gy: 5 },
+            { type: 'fireplace', gx: 6, gy: 1 },
+            { type: 'bed', gx: 1, gy: 3 },
+            { type: 'shelf', gx: 3, gy: 3 },
             { type: 'table', gx: 6, gy: 5, desc: 'Strange symbols scratched into the wood.' },
-            { type: 'note', gx: 5, gy: 4 },
-            { type: 'cabin_window', gx: 6, gy: 1 }
+            { type: 'note', gx: 3, gy: 2 },
+            { type: 'cabin_window', gx: 2, gy: 5 }
         ]
     },
     {
@@ -360,12 +362,12 @@ TWB.CABIN_TYPES = [
         loot: ['wood', 'wood', 'firewood', 'rope', 'sticks'],
         maxSearch: 3,
         interior: [
-            { type: 'fireplace', gx: 3, gy: 2 },
-            { type: 'bed', gx: 9, gy: 2 },
-            { type: 'crate', gx: 2, gy: 5 },
-            { type: 'table', gx: 6, gy: 4, desc: 'Sawdust everywhere. A sharpening stone.' },
-            { type: 'note', gx: 7, gy: 3 },
-            { type: 'cabin_window', gx: 6, gy: 1 }
+            { type: 'fireplace', gx: 1, gy: 1 },
+            { type: 'bed', gx: 6, gy: 3 },
+            { type: 'crate', gx: 1, gy: 3 },
+            { type: 'table', gx: 6, gy: 5, desc: 'Sawdust everywhere. A sharpening stone.' },
+            { type: 'note', gx: 5, gy: 2 },
+            { type: 'cabin_window', gx: 2, gy: 5 }
         ]
     },
     {
@@ -374,12 +376,12 @@ TWB.CABIN_TYPES = [
         loot: ['meat', 'meat', 'trap', 'trap', 'rope'],
         maxSearch: 3,
         interior: [
-            { type: 'fireplace', gx: 9, gy: 2 },
-            { type: 'bed', gx: 2, gy: 2 },
-            { type: 'crate', gx: 2, gy: 5 },
-            { type: 'crate', gx: 3, gy: 7 },
-            { type: 'note', gx: 5, gy: 4 },
-            { type: 'cabin_window', gx: 6, gy: 1 }
+            { type: 'fireplace', gx: 6, gy: 1 },
+            { type: 'bed', gx: 1, gy: 3 },
+            { type: 'crate', gx: 3, gy: 3 },
+            { type: 'crate', gx: 4, gy: 3 },
+            { type: 'note', gx: 4, gy: 2 },
+            { type: 'cabin_window', gx: 2, gy: 5 }
         ]
     },
     {
@@ -388,11 +390,11 @@ TWB.CABIN_TYPES = [
         loot: ['canned_food', 'canteen', 'bandage', 'pasta', 'rice', 'olive_oil'],
         maxSearch: 3,
         interior: [
-            { type: 'fireplace', gx: 3, gy: 2 },
-            { type: 'bed', gx: 9, gy: 2 },
+            { type: 'fireplace', gx: 1, gy: 1 },
+            { type: 'bed', gx: 6, gy: 3 },
             { type: 'table', gx: 6, gy: 5, desc: 'An empty water bottle. Torn map pieces.' },
-            { type: 'note', gx: 6, gy: 4 },
-            { type: 'cabin_window', gx: 6, gy: 1 }
+            { type: 'note', gx: 3, gy: 2 },
+            { type: 'cabin_window', gx: 2, gy: 5 }
         ]
     }
 ];
@@ -415,7 +417,7 @@ TWB.buildCabinInterior = function(cabinIdx) {
         }
         objs.push(obj);
     }
-    objs.push({ type: 'cabin_door', x: 6 * 32, y: 8 * 32, solid: false });
+    objs.push({ type: 'cabin_door', x: 4 * 32, y: TWB.INTERIOR_ROWS * 32 - 6, solid: false });
     return objs;
 };
 
@@ -519,6 +521,199 @@ TWB.initWorld = function() {
     TWB.generateSnowZones();
 };
 
+// === DYNAMIC NOTE GENERATOR ===
+
+TWB.getCabinLandmark = function(cabinIdx) {
+    var c = TWB._cabinData[cabinIdx];
+    var cx = c.cx, cy = c.cy;
+    var r1 = TWB.getRiverCenter(cy);
+    if (Math.abs(cx - r1) < 30) return 'near the river';
+    var r = TWB._riverParams;
+    if (r && cy > r.r2startY && cy < r.r2endY) {
+        var r2 = TWB.getSecondRiver(cy);
+        if (Math.abs(cx - r2) < 30) return 'near the river';
+    }
+    if (cx < 30 || cx > TWB.COLS - 30 || cy < 30 || cy > TWB.ROWS - 30) return 'at the edge of the mountains';
+    var snow = TWB.getSnowLevel(cx, cy);
+    if (snow > 0) return 'in the snowy highlands';
+    return 'deep in the forest';
+};
+
+TWB.getCabinDirection = function(fromIdx, toIdx) {
+    var from = TWB._cabinData[fromIdx];
+    var to = TWB._cabinData[toIdx];
+    var dx = to.cx - from.cx;
+    var dy = to.cy - from.cy;
+    var dir = '';
+    if (Math.abs(dy) > Math.abs(dx) * 0.3) dir += dy < 0 ? 'north' : 'south';
+    if (Math.abs(dx) > Math.abs(dy) * 0.3) dir += (dir ? '-' : '') + (dx > 0 ? 'east' : 'west');
+    if (!dir) dir = 'nearby';
+    return dir;
+};
+
+TWB.generateDynamicNote = function(fromIdx, toIdx, itemName, stepIndex) {
+    var dir = TWB.getCabinDirection(fromIdx, toIdx);
+    var landmark = TWB.getCabinLandmark(toIdx);
+    var templates = [
+        'The radio is broken. I hid the\n' + itemName + ' in a cabin to the\n' + dir + ', ' + landmark + '.\nGet it before the storm.',
+        'If you find this: the ' + itemName + '\nis in a shelter ' + dir + ' of here,\n' + landmark + '.\nI couldn\'t carry it all.',
+        'The shadows are closer now.\nI left the ' + itemName + ' in a\ncabin ' + dir + ', ' + landmark + '.\nDon\'t look back.'
+    ];
+    return templates[stepIndex % templates.length];
+};
+
+TWB.generateFinalNote = function(fromIdx, targetIdx) {
+    var dir = TWB.getCabinDirection(fromIdx, targetIdx);
+    var landmark = TWB.getCabinLandmark(targetIdx);
+    return 'The relay station is ' + dir + ',\n' + landmark + '.\nBring all parts there.\nIt\'s our only way out.';
+};
+
+TWB.generateRescueNote = function(fromIdx, toIdx, itemName, stepIndex) {
+    var dir = TWB.getCabinDirection(fromIdx, toIdx);
+    var landmark = TWB.getCabinLandmark(toIdx);
+    var templates = [
+        'Found tracks heading ' + dir + '.\nThe hiker left gear behind.\nThere\'s a cabin ' + landmark + '.\nMaybe more clues there.',
+        'A torn page from a journal.\nMentions a shelter ' + dir + ',\n' + landmark + '.\nThey were heading that way.',
+        'Bootprints in the mud lead\n' + dir + '. A cabin ' + landmark + '\nmight hold the last clue.\nHurry — the weather\'s turning.'
+    ];
+    return templates[stepIndex % templates.length];
+};
+
+TWB.generateRescueFinalNote = function(fromIdx, targetIdx) {
+    var dir = TWB.getCabinDirection(fromIdx, targetIdx);
+    var landmark = TWB.getCabinLandmark(targetIdx);
+    return 'The hiker\'s trail leads ' + dir + ',\n' + landmark + '.\nUse the flare when you arrive.\nRescue will see it.';
+};
+
+// === SCENARIO SYSTEM ===
+
+TWB.initScenario = function() {
+    var scenarios = ['RESCUE', 'RELAY', 'CURSE'];
+    TWB._scenario = scenarios[Math.floor(Math.random() * scenarios.length)];
+    TWB._scenarioData = {};
+
+    var cabins = TWB._cabinData;
+    var start = TWB._startCabin;
+    var sd = TWB._scenarioData;
+
+    if (TWB._scenario === 'RESCUE') {
+        var farthest = -1, farthestDist = 0;
+        for (var i = 1; i < cabins.length; i++) {
+            var dx = cabins[i].cx - cabins[start].cx;
+            var dy = cabins[i].cy - cabins[start].cy;
+            var d = Math.sqrt(dx * dx + dy * dy);
+            if (d > farthestDist) { farthestDist = d; farthest = i; }
+        }
+        sd.targetCabin = farthest;
+        TWB._targetCabin = farthest;
+
+        var midCabins = [];
+        for (var i = 1; i < cabins.length; i++) {
+            if (i === farthest) continue;
+            midCabins.push(i);
+        }
+        midCabins.sort(function(a, b) {
+            var da = Math.sqrt(Math.pow(cabins[a].cx - cabins[start].cx, 2) + Math.pow(cabins[a].cy - cabins[start].cy, 2));
+            var db = Math.sqrt(Math.pow(cabins[b].cx - cabins[start].cx, 2) + Math.pow(cabins[b].cy - cabins[start].cy, 2));
+            return da - db;
+        });
+        var third = Math.floor(midCabins.length / 3);
+        sd.clueCabins = [
+            midCabins[Math.floor(Math.random() * third)],
+            midCabins[third + Math.floor(Math.random() * third)],
+            midCabins[third * 2 + Math.floor(Math.random() * (midCabins.length - third * 2))]
+        ];
+        sd.cluesFound = [false, false, false];
+        sd.clueNotes = [
+            TWB.generateRescueNote(sd.clueCabins[0], sd.clueCabins[1], 'clue', 0),
+            TWB.generateRescueNote(sd.clueCabins[1], sd.clueCabins[2], 'clue', 1),
+            TWB.generateRescueFinalNote(sd.clueCabins[2], farthest)
+        ];
+        sd.clueNotesRead = [false, false, false];
+        sd.revealedCabins = [sd.clueCabins[0]];
+        sd.objectiveText = 'Search nearby cabins for clues.';
+
+    } else if (TWB._scenario === 'RELAY') {
+        var farthest = -1, farthestDist = 0;
+        for (var i = 1; i < cabins.length; i++) {
+            var dx = cabins[i].cx - cabins[start].cx;
+            var dy = cabins[i].cy - cabins[start].cy;
+            var d = Math.sqrt(dx * dx + dy * dy);
+            if (d > farthestDist) { farthestDist = d; farthest = i; }
+        }
+        sd.relayCabin = farthest;
+        TWB._targetCabin = farthest;
+
+        var candidates = [];
+        for (var i = 1; i < cabins.length; i++) {
+            if (i === farthest) continue;
+            var dx = cabins[i].cx - cabins[start].cx;
+            var dy = cabins[i].cy - cabins[start].cy;
+            candidates.push({ idx: i, dist: Math.sqrt(dx * dx + dy * dy) });
+        }
+        candidates.sort(function(a, b) { return a.dist - b.dist; });
+        var third = Math.floor(candidates.length / 3);
+        sd.partCabins = [
+            candidates[Math.floor(Math.random() * Math.max(1, third))].idx,
+            candidates[third + Math.floor(Math.random() * Math.max(1, third))].idx,
+            candidates[third * 2 + Math.floor(Math.random() * Math.max(1, candidates.length - third * 2))].idx
+        ];
+        for (var ci = 1; ci < sd.partCabins.length; ci++) {
+            if (sd.partCabins[ci] === sd.partCabins[ci - 1]) {
+                for (var fi = 0; fi < candidates.length; fi++) {
+                    if (sd.partCabins.indexOf(candidates[fi].idx) === -1) {
+                        sd.partCabins[ci] = candidates[fi].idx;
+                        break;
+                    }
+                }
+            }
+        }
+        sd.partsFound = [false, false, false];
+        sd.partNames = ['Battery', 'Antenna Wire', 'Power Fuse'];
+        sd.partNotes = [
+            TWB.generateDynamicNote(sd.partCabins[0], sd.partCabins[1], 'Antenna Wire', 0),
+            TWB.generateDynamicNote(sd.partCabins[1], sd.partCabins[2], 'Power Fuse', 1),
+            TWB.generateFinalNote(sd.partCabins[2], farthest)
+        ];
+        sd.notesRead = [false, false, false];
+        sd.revealedCabins = [sd.partCabins[0]];
+        sd.objectiveText = 'Search nearby cabins for radio parts.';
+
+    } else if (TWB._scenario === 'CURSE') {
+        var farthest = -1, farthestDist = 0;
+        for (var i = 1; i < cabins.length; i++) {
+            var dx = cabins[i].cx - cabins[start].cx;
+            var dy = cabins[i].cy - cabins[start].cy;
+            var d = Math.sqrt(dx * dx + dy * dy);
+            if (d > farthestDist) { farthestDist = d; farthest = i; }
+        }
+        sd.shrineCabin = farthest;
+        TWB._targetCabin = farthest;
+
+        sd.curseShrines = [];
+        for (var si = 0; si < 3; si++) {
+            var sx, sy, attempts = 0;
+            do {
+                sx = 30 + Math.floor(Math.random() * (TWB.COLS - 60));
+                sy = 30 + Math.floor(Math.random() * (TWB.ROWS - 60));
+                var valid = true;
+                for (var ci = 0; ci < cabins.length; ci++) {
+                    if (Math.abs(sx - cabins[ci].cx) < 8 && Math.abs(sy - cabins[ci].cy) < 8) { valid = false; break; }
+                }
+                for (var sj = 0; sj < sd.curseShrines.length; sj++) {
+                    if (Math.abs(sx - sd.curseShrines[sj].tx) < 20 && Math.abs(sy - sd.curseShrines[sj].ty) < 20) { valid = false; break; }
+                }
+                var gt = TWB.getGround(sx, sy);
+                if (gt === TWB.T_WATER || gt === TWB.T_WATER_DEEP) valid = false;
+                attempts++;
+            } while (!valid && attempts < 100);
+            sd.curseShrines.push({ tx: sx, ty: sy, lit: false, relicTaken: false });
+        }
+        sd.relicsPlaced = 0;
+        sd.objectiveText = 'Light 3 shrines and collect the Relics.';
+    }
+};
+
 // === OBJECT GENERATION ===
 
 TWB.generateObjects = function() {
@@ -527,6 +722,7 @@ TWB.generateObjects = function() {
     var objs = [];
 
     TWB._targetCabin = 1 + Math.floor(Math.random() * (TWB._cabinData.length - 1));
+    TWB.initScenario();
 
     TWB._cabinData[0].type = 0;
     TWB._cabinData[0].damaged = false;
@@ -670,6 +866,23 @@ TWB.generateObjects = function() {
         }
         if (nearCab2) continue;
         objs.push({ type: 'shrine', x: shx * TWB.TILE, y: shy * TWB.TILE, solid: true, colR: 12, lit: false, litFuel: 0 });
+    }
+
+    if (TWB._scenario === 'CURSE') {
+        var cs = TWB._scenarioData.curseShrines;
+        for (var csi = 0; csi < cs.length; csi++) {
+            objs.push({
+                type: 'curse_shrine',
+                x: cs[csi].tx * TWB.TILE,
+                y: cs[csi].ty * TWB.TILE,
+                solid: true,
+                colR: 12,
+                lit: false,
+                litFuel: 0,
+                relicTaken: false,
+                shrineIdx: csi
+            });
+        }
     }
 
     var berryCount = 60;

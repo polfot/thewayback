@@ -772,6 +772,32 @@ function drawShrineSprite(ctx) {
     px(ctx, 10, 16, 1, 10, dk);
 }
 
+function drawCurseShrineSprite(ctx) {
+    shadow(ctx, 4, 38, 24, 4);
+    var dk = '#1a1020'; var md = '#221828'; var lt = '#2e2234';
+    var hi = '#3a2e40'; var hi2 = '#4a3e50';
+    px(ctx, 2, 34, 12, 2, dk);
+    px(ctx, 1, 32, 14, 2, md);
+    px(ctx, 2, 30, 12, 2, lt);
+    px(ctx, 4, 14, 8, 16, md);
+    px(ctx, 5, 14, 6, 16, lt);
+    px(ctx, 3, 28, 10, 2, dk);
+    px(ctx, 5, 18, 6, 6, '#0a0412');
+    px(ctx, 6, 19, 4, 4, '#120820');
+    px(ctx, 5, 17, 6, 1, hi);
+    px(ctx, 5, 24, 6, 1, hi);
+    px(ctx, 5, 18, 1, 6, hi);
+    px(ctx, 10, 18, 1, 6, hi);
+    px(ctx, 3, 12, 10, 2, lt);
+    px(ctx, 4, 10, 8, 2, hi);
+    px(ctx, 5, 8, 6, 2, hi);
+    px(ctx, 7, 2, 2, 6, hi2);
+    px(ctx, 5, 4, 6, 2, hi2);
+    px(ctx, 6, 14, 1, 4, hi);
+    px(ctx, 5, 30, 1, 2, hi);
+    px(ctx, 10, 16, 1, 10, dk);
+}
+
 function drawCairnSprite(ctx) {
     shadow(ctx, 3, 26, 18, 4);
     var dk = '#1a1816'; var md = '#242220'; var lt = '#302c28';
@@ -880,7 +906,7 @@ TWB.initSprites = function() {
 
     TWB.Sprites.tree_pine = makeCanvas(48, 80, drawPine);
     TWB.Sprites.tree_oak = makeCanvas(48, 64, drawOak);
-    TWB.Sprites.cabin = makeCanvas(96, 72, drawCabinSprite);
+    TWB.Sprites.cabin = TWB.Resources.spr_cabin || makeCanvas(96, 72, drawCabinSprite);
     TWB.Sprites.campfire = makeCanvas(28, 24, drawCampfireSprite);
     TWB.Sprites.rock = makeCanvas(24, 20, drawRockSprite);
     TWB.Sprites.boulder = makeCanvas(64, 52, drawBoulderSprite);
@@ -898,16 +924,17 @@ TWB.initSprites = function() {
         px(ctx, 2, 6, 6, 1, '#1a1a14');
     });
     TWB.Sprites.fireplace = makeCanvas(32, 28, drawFireplaceSprite);
-    TWB.Sprites.bed = makeCanvas(40, 24, drawBedSprite);
-    TWB.Sprites.cabinet = makeCanvas(28, 24, drawCabinetSprite);
-    TWB.Sprites.cabin_door = makeCanvas(24, 24, drawCabinDoorSprite);
-    TWB.Sprites.table = makeCanvas(32, 22, drawTableSprite);
+    TWB.Sprites.bed = TWB.Resources.spr_bed || makeCanvas(40, 24, drawBedSprite);
+    TWB.Sprites.cabinet = TWB.Resources.spr_cabinet || makeCanvas(28, 24, drawCabinetSprite);
+    TWB.Sprites.cabin_door = TWB.Resources.spr_door || makeCanvas(24, 24, drawCabinDoorSprite);
+    TWB.Sprites.table = TWB.Resources.spr_table || makeCanvas(32, 22, drawTableSprite);
     TWB.Sprites.shelf = makeCanvas(28, 20, drawShelfSprite);
     TWB.Sprites.crate = makeCanvas(24, 22, drawCrateSprite);
     TWB.Sprites.note = makeCanvas(14, 10, drawNoteSprite);
     TWB.Sprites.cabin_window = makeCanvas(28, 22, drawWindowSprite);
     TWB.Sprites.cairn = makeCanvas(24, 30, drawCairnSprite);
     TWB.Sprites.shrine = makeCanvas(32, 44, drawShrineSprite);
+    TWB.Sprites.curse_shrine = makeCanvas(32, 44, drawCurseShrineSprite);
     TWB.Sprites.bridge = makeCanvas(32, 32, drawBridgeSprite);
     TWB.Sprites.broken_bridge = makeCanvas(32, 32, drawBrokenBridgeSprite);
     TWB.Sprites.stepping_stones = makeCanvas(32, 32, drawSteppingStonesSprite);
@@ -928,7 +955,7 @@ TWB.getSpriteAnchor = function(type) {
     switch (type) {
         case 'tree_pine': return { x: 24, y: 72 };
         case 'tree_oak': return { x: 24, y: 56 };
-        case 'cabin': return { x: 48, y: 64 };
+        case 'cabin': return TWB.Resources.spr_cabin ? { x: 48, y: 100 } : { x: 48, y: 64 };
         case 'campfire': return { x: 14, y: 18 };
         case 'rock': return { x: 12, y: 16 };
         case 'boulder': return { x: 32, y: 44 };
@@ -939,16 +966,17 @@ TWB.getSpriteAnchor = function(type) {
         case 'herb_vikos': return { x: 8, y: 18 };
         case 'trap': return { x: 10, y: 12 };
         case 'fireplace': return { x: 16, y: 26 };
-        case 'bed': return { x: 20, y: 20 };
-        case 'cabinet': return { x: 14, y: 20 };
-        case 'cabin_door': return { x: 12, y: 20 };
-        case 'table': return { x: 16, y: 18 };
+        case 'bed': return TWB.Resources.spr_bed ? { x: 20, y: 53 } : { x: 20, y: 20 };
+        case 'cabinet': return TWB.Resources.spr_cabinet ? { x: 14, y: 22 } : { x: 14, y: 20 };
+        case 'cabin_door': return TWB.Resources.spr_door ? { x: 12, y: 30 } : { x: 12, y: 20 };
+        case 'table': return TWB.Resources.spr_table ? { x: 16, y: 16 } : { x: 16, y: 18 };
         case 'shelf': return { x: 14, y: 16 };
         case 'crate': return { x: 12, y: 18 };
         case 'note': return { x: 7, y: 8 };
         case 'cabin_window': return { x: 14, y: 18 };
         case 'cairn': return { x: 12, y: 26 };
         case 'shrine': return { x: 16, y: 38 };
+        case 'curse_shrine': return { x: 16, y: 38 };
         case 'bridge': return { x: 16, y: 16 };
         case 'broken_bridge': return { x: 16, y: 16 };
         case 'stepping_stones': return { x: 16, y: 16 };

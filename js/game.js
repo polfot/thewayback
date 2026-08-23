@@ -195,6 +195,10 @@ TWB.ACTIONS = {
         { label: 'Light kandili', action: 'light_kandili' },
         { label: 'Pray', action: 'pray_shrine' }
     ],
+    curse_shrine: [
+        { label: 'Light shrine', action: 'light_curse_shrine' },
+        { label: 'Take relic', action: 'take_relic' }
+    ],
     broken_bridge: [
         { label: 'Repair bridge', action: 'repair_bridge' }
     ],
@@ -233,6 +237,7 @@ TWB.Game = function(canvas) {
     this.notification = null;
 
     this.stats = { energy: 100, health: 100, hunger: 100, thirst: 100 };
+    this.runStats = { cabinsVisited: {}, distWalked: 0, mealsEaten: 0, itemsCrafted: 0, animalsHunted: 0, fishCaught: 0, predators: 0, nightsOut: 0, shadowHits: 0, lowestHP: 100, dogFed: 0, woodBurned: 0, storms: 0, itemsFound: 0 };
     this.wolfStats = { energy: 80, health: 100, hunger: 80, thirst: 80, mood: 'Loyal' };
     this.backpack = [null, null, null, null, null, null, null, null, null, null];
     this.backpackOpen = false;
@@ -277,6 +282,9 @@ TWB.Game = function(canvas) {
     this.dead = false;
     this.deathTimer = 0;
     this.deathCause = '';
+    this.knockoutUsed = false;
+    this.knockoutActive = false;
+    this.knockoutTimer = 0;
     this.cheatBuffer = '';
 
     this.shadows = [];
@@ -457,7 +465,7 @@ TWB.Game.prototype.setupInput = function() {
 
     this.canvas.addEventListener('click', function(e) {
         if (self.windowView) { self.windowView = null; return; }
-        if (self.readingNote) { self.readingNote = null; return; }
+        if (self.readingNote) { self.dismissNote(); return; }
         if (self.elderDialogue) { self.elderDialogue = null; return; }
         if (self.victory || self.dead) return;
         var rect = self.canvas.getBoundingClientRect();
@@ -544,15 +552,19 @@ TWB.Game.prototype.setupInput = function() {
                             self.stats.energy = Math.min(100, self.stats.energy + enGain);
                             self.stats.health = Math.min(100, self.stats.health + hpGain);
                             self.stats.hunger = Math.min(100, self.stats.hunger + hunGain);
+                            self.runStats.mealsEaten++;
                             msg = 'Ate ' + label + ' (+' + hunGain + ' hunger)';
                             break;
                         case 'feed':
                             var wEnGain = slot.type === 'food' ? 25 : (slot.type === 'canned_food' ? 18 : 4);
                             var wHunGain = slot.type === 'food' ? 35 : (slot.type === 'canned_food' ? 25 : 6);
+                            var wHpGain = slot.type === 'food' ? 8 : (slot.type === 'canned_food' ? 5 : 1);
                             self.removeFromBackpack(slot.type, 1);
                             self.wolfStats.energy = Math.min(100, self.wolfStats.energy + wEnGain);
                             self.wolfStats.hunger = Math.min(100, self.wolfStats.hunger + wHunGain);
+                            self.wolfStats.health = Math.min(100, self.wolfStats.health + wHpGain);
                             if (slot.type === 'food') self.wolfStats.mood = 'Happy';
+                            self.runStats.dogFed++;
                             msg = 'Fed ' + (self.dogName || 'wolf') + ' ' + label + ' (+' + wHunGain + ' hunger)';
                             break;
                         case 'drink_canteen':
@@ -560,6 +572,12 @@ TWB.Game.prototype.setupInput = function() {
                             self.addToBackpack('canteen', 1);
                             self.stats.thirst = Math.min(100, self.stats.thirst + 35);
                             msg = 'Drank from canteen (+35 thirst)';
+                            break;
+                        case 'dog_drink_canteen':
+                            self.removeFromBackpack('canteen_full', 1);
+                            self.addToBackpack('canteen', 1);
+                            self.wolfStats.thirst = Math.min(100, self.wolfStats.thirst + 35);
+                            msg = (self.dogName || 'Dog') + ' drank from canteen (+35 thirst)';
                             break;
                         case 'use_bandage':
                             self.removeFromBackpack('bandage', 1);
@@ -697,7 +715,7 @@ TWB.Game.prototype.setupInput = function() {
             return;
         }
         if (self.readingNote) {
-            self.readingNote = null;
+            self.dismissNote();
             return;
         }
         if ((self.victory || self.dead) && (e.key === 'r' || e.key === 'R')) {
@@ -936,8 +954,15 @@ TWB.Game.prototype.setupInput = function() {
                 self.notification = { text: self.snowing ? 'Snow ON' : 'Snow OFF', timer: 120 };
                 self.cheatBuffer = '';
             }
+            if (cb.slice(-5) === 'where') {
+                self.showPlayerOnMap = true;
+                self.mapOpen = true;
+                self.backpackOpen = false;
+                self.craftingOpen = false;
+                self.cheatBuffer = '';
+            }
             if (cb.slice(-5) === 'codes') {
-                self.notification = { text: 'night day starve feed rest shadow quest rescue easy hard normal ghost torch curse debt mystery elder snow', timer: 400 };
+                self.notification = { text: 'night day starve feed rest shadow quest rescue easy hard normal ghost torch curse debt mystery elder snow where', timer: 400 };
                 self.cheatBuffer = '';
             }
         }
@@ -967,7 +992,7 @@ TWB.Game.prototype.findObjectAt = function(wx, wy) {
                    (obj.type === 'note') ? 20 :
                    (obj.type === 'cabin_window') ? 28 :
                    (obj.type === 'cairn') ? 24 :
-                   (obj.type === 'shrine') ? 28 :
+                   (obj.type === 'shrine' || obj.type === 'curse_shrine') ? 28 :
                    (obj.type === 'bridge' || obj.type === 'broken_bridge' || obj.type === 'stepping_stones') ? 32 : 40;
         if (d < hitR && d < bestDist) {
             bestDist = d;
@@ -1041,15 +1066,18 @@ TWB.Game.prototype.getMenuItemAt = function(sx, sy) {
 };
 
 TWB.Game.prototype.addToBackpack = function(type, count) {
+    var maxStack = type === 'berries' ? Infinity : 10;
     for (var i = 0; i < this.backpack.length; i++) {
         if (this.backpack[i] && this.backpack[i].type === type) {
-            this.backpack[i].count += count;
+            var canAdd = Math.min(count, maxStack - this.backpack[i].count);
+            if (canAdd <= 0) return false;
+            this.backpack[i].count += canAdd;
             return true;
         }
     }
     for (var i = 0; i < this.backpack.length; i++) {
         if (!this.backpack[i]) {
-            this.backpack[i] = { type: type, count: count };
+            this.backpack[i] = { type: type, count: Math.min(count, maxStack) };
             return true;
         }
     }
@@ -1081,13 +1109,17 @@ TWB.ITEM_LABELS = {
     trap: 'Trap', canteen: 'Canteen', canteen_full: 'Canteen (full)',
     rope: 'Rope', knife: 'Knife', torch: 'Torch', bandage: 'Bandage',
     fishing_rod: 'Fishing Rod', lighter: 'Lighter',
-    olive_oil: 'Olive Oil', vikosherb: '3-Leaf Herb'
+    olive_oil: 'Olive Oil', vikosherb: '3-Leaf Herb',
+    ski_goggles: 'Ski Goggles', torn_map: 'Torn Map', flare: 'Flare',
+    battery: 'Battery', antenna: 'Antenna', fuse: 'Fuse',
+    relic: 'Holy Relic'
 };
 
 TWB.ITEM_SHORT = {
     vikosherb: 'Herb', canned_food: 'Canned', expired_food: 'Exp.Food',
     fishing_rod: 'F.Rod', canteen_full: 'Water', olive_oil: 'Oil',
-    firewood: 'Fwood', lighter: 'Lightr', bandage: 'Bandge'
+    firewood: 'Fwood', lighter: 'Lightr', bandage: 'Bandge',
+    ski_goggles: 'Goggle', torn_map: 'Map', antenna: 'Antnna'
 };
 
 TWB.EDIBLE = { berries: true, food: true, canned_food: true };
@@ -1159,7 +1191,7 @@ TWB.Game.prototype.getBackpackBtns = function() {
     if (this.backpackHover < 0 || !this.backpack[this.backpackHover]) return [];
     var slot = this.backpack[this.backpackHover];
     if (TWB.EDIBLE[slot.type]) return ['eat', 'feed', 'drop1', 'dropall'];
-    if (slot.type === 'canteen_full') return ['drink_canteen', 'drop1', 'dropall'];
+    if (slot.type === 'canteen_full') return ['drink_canteen', 'dog_drink_canteen', 'drop1', 'dropall'];
     if (slot.type === 'bandage') return ['use_bandage', 'drop1', 'dropall'];
     return ['drop1', 'dropall'];
 };
@@ -1170,7 +1202,7 @@ TWB.Game.prototype.getBackpackBtnAt = function(sx, sy) {
     var l = this.getBackpackLayout();
     var totalRows = Math.ceil(this.backpack.length / l.cols);
     var baseY = l.slotsY + totalRows * (l.slotSize + l.gap) + 4;
-    var btnW = 70;
+    var btnW = 80;
     var btnH = 20;
     var gapX = 12;
     var gapY = 6;
@@ -1337,11 +1369,13 @@ TWB.Game.prototype.executeAction = function(obj, action) {
                 this.removeFromBackpack('firewood', 1);
                 if (obj.tempFuel !== undefined) { obj.tempFuel = Math.min(100, obj.tempFuel + 40); }
                 else { this.fireFuel = Math.min(100, this.fireFuel + 40); }
+                this.runStats.woodBurned++;
                 msg = 'Added firewood (+40 fuel)';
             } else {
                 this.removeFromBackpack('wood', 1);
                 if (obj.tempFuel !== undefined) { obj.tempFuel = Math.min(100, obj.tempFuel + 25); }
                 else { this.fireFuel = Math.min(100, this.fireFuel + 25); }
+                this.runStats.woodBurned++;
                 msg = 'Added wood (+25 fuel)';
             }
             break;
@@ -1414,6 +1448,7 @@ TWB.Game.prototype.executeAction = function(obj, action) {
                 s.hunger = Math.max(0, s.hunger - 20);
                 s.thirst = Math.max(0, s.thirst - 25);
                 this.wolfStats.energy = Math.min(100, this.wolfStats.energy + 40);
+                this.wolfStats.health = Math.min(100, this.wolfStats.health + 20);
                 this.wolfStats.hunger = Math.max(0, this.wolfStats.hunger - 15);
                 this.wolfStats.thirst = Math.max(0, this.wolfStats.thirst - 20);
                 this.wolfStats.mood = 'Loyal';
@@ -1428,6 +1463,8 @@ TWB.Game.prototype.executeAction = function(obj, action) {
             var searchCount = this.cabinSearches[searchKey] || 0;
             var cabinType = TWB.CABIN_TYPES[TWB._cabinData[searchKey].type];
             var searchLimit = this.difficulty === 0 ? cabinType.maxSearch + 2 : this.difficulty === 2 ? Math.max(1, cabinType.maxSearch - 1) : cabinType.maxSearch;
+            var hasQuestItem = !this.lighterFound || this.getScenarioItem(searchKey);
+            if (hasQuestItem) searchLimit = Math.max(searchLimit, searchCount + 1);
             if (searchCount >= searchLimit) { msg = 'Nothing left to find'; break; }
             this.cabinSearches[searchKey] = searchCount + 1;
             s.energy = Math.max(0, s.energy - 3);
@@ -1439,6 +1476,19 @@ TWB.Game.prototype.executeAction = function(obj, action) {
                     break;
                 }
                 msg = 'Found Lighter!';
+                this.runStats.itemsFound++;
+                break;
+            }
+            var sqItem = this.getScenarioItem(searchKey);
+            if (sqItem) {
+                if (!this.addToBackpack(sqItem.item, 1)) {
+                    msg = 'Backpack is full!';
+                    this.cabinSearches[searchKey]--;
+                    break;
+                }
+                sqItem.callback();
+                msg = sqItem.msg;
+                this.runStats.itemsFound++;
                 break;
             }
             var finds = cabinType.loot;
@@ -1449,6 +1499,7 @@ TWB.Game.prototype.executeAction = function(obj, action) {
                 break;
             }
             msg = 'Found ' + (TWB.ITEM_LABELS[found] || found) + '!';
+            this.runStats.itemsFound++;
             break;
         case 'add_fp_wood':
             var fpWood = this.getItemCount('wood');
@@ -1457,10 +1508,12 @@ TWB.Game.prototype.executeAction = function(obj, action) {
             if (fpFw > 0) {
                 this.removeFromBackpack('firewood', 1);
                 this.fireplaceFuel = Math.min(100, this.fireplaceFuel + 40);
+                this.runStats.woodBurned++;
                 msg = 'Added firewood (+40 fuel)';
             } else {
                 this.removeFromBackpack('wood', 1);
                 this.fireplaceFuel = Math.min(100, this.fireplaceFuel + 25);
+                this.runStats.woodBurned++;
                 msg = 'Added wood (+25 fuel)';
             }
             break;
@@ -1515,6 +1568,7 @@ TWB.Game.prototype.executeAction = function(obj, action) {
             if (obj.caught) {
                 var animal = obj.caught;
                 if (!this.addToBackpack('meat', animal.meat)) { msg = 'Backpack is full!'; break; }
+                this.runStats.animalsHunted++;
                 msg = 'Caught a ' + animal.name + '! +' + animal.meat + ' Meat';
                 obj.caught = null;
                 obj.timer = 0;
@@ -1683,6 +1737,48 @@ TWB.Game.prototype.executeAction = function(obj, action) {
             this.wolfStats.energy = Math.min(100, this.wolfStats.energy + 5);
             msg = 'A moment of peace. You feel rested.';
             break;
+        case 'light_curse_shrine':
+            if (obj.lit) { msg = 'Already lit. A purple flame flickers...'; break; }
+            if (this.getItemCount('lighter') <= 0) { msg = 'Need a lighter.'; break; }
+            if (this.getItemCount('olive_oil') > 0) {
+                this.removeFromBackpack('olive_oil', 1);
+                obj.lit = true;
+                obj.litFuel = 900;
+                msg = 'A cold purple flame ignites... something stirs.';
+            } else if (this.getItemCount('wood') > 0) {
+                this.removeFromBackpack('wood', 1);
+                obj.lit = true;
+                obj.litFuel = 450;
+                msg = 'The shrine burns with an eerie glow...';
+            } else {
+                msg = 'Need oil or wood to light it.';
+            }
+            if (obj.lit) {
+                var csd = TWB._scenarioData;
+                if (csd.curseShrines && obj.shrineIdx !== undefined) {
+                    csd.curseShrines[obj.shrineIdx].lit = true;
+                }
+                this._mapCanvas = null;
+            }
+            break;
+        case 'take_relic':
+            if (!obj.lit) { msg = 'The shrine is dark. Light it first.'; break; }
+            if (obj.relicTaken) { msg = 'Already taken.'; break; }
+            obj.relicTaken = true;
+            if (!this.addToBackpack('relic', 1)) { obj.relicTaken = false; msg = 'Backpack full!'; break; }
+            var relicCount = this.getItemCount('relic');
+            var csd2 = TWB._scenarioData;
+            if (csd2.curseShrines && obj.shrineIdx !== undefined) {
+                csd2.curseShrines[obj.shrineIdx].relicTaken = true;
+            }
+            if (relicCount >= 3) {
+                csd2.objectiveText = 'Bring the relics to the cursed cabin!';
+            } else {
+                csd2.objectiveText = 'Collect relics. (' + relicCount + '/3)';
+            }
+            msg = 'Took a Holy Relic. The air grows heavier... (' + relicCount + '/3)';
+            this._mapCanvas = null;
+            break;
         case 'repair_bridge':
             var bWood = this.getItemCount('wood');
             if (bWood < 3) { msg = 'Need 3 wood to repair the bridge.'; break; }
@@ -1732,6 +1828,101 @@ TWB.Game.prototype.executeAction = function(obj, action) {
     this.notification = { text: msg, timer: 120 };
 };
 
+TWB.Game.prototype.getScenarioItem = function(cabinIdx) {
+    var sd = TWB._scenarioData;
+    var self = this;
+    if (TWB._scenario === 'RESCUE') {
+        for (var i = 0; i < 3; i++) {
+            if (sd.clueCabins[i] === cabinIdx && !sd.cluesFound[i]) {
+                var items = ['ski_goggles', 'torn_map', 'flare'];
+                var msgs = [
+                    'Found Ski Goggles! A clue to the hiker\'s path.',
+                    'Found a Torn Map! Another cabin is marked.',
+                    'Found an Emergency Flare!'
+                ];
+                var idx = i;
+                var noteText = sd.clueNotes ? sd.clueNotes[i] : null;
+                return {
+                    item: items[i],
+                    msg: msgs[i],
+                    callback: function() {
+                        sd.cluesFound[idx] = true;
+                        var found = 0;
+                        for (var j = 0; j < 3; j++) { if (sd.cluesFound[j]) found++; }
+                        if (found === 1) sd.objectiveText = 'Follow the hiker\'s trail. (1/3 clues)';
+                        else if (found === 2) sd.objectiveText = 'One more clue remains. (2/3 clues)';
+                        else sd.objectiveText = 'Find the hiker\'s cabin!';
+                        self._mapCanvas = null;
+                        if (noteText) {
+                            self.readingNote = noteText;
+                            self._pendingNoteReveal = idx;
+                            self._pendingNoteScenario = 'RESCUE';
+                        }
+                    }
+                };
+            }
+        }
+    } else if (TWB._scenario === 'RELAY') {
+        for (var i = 0; i < 3; i++) {
+            if (sd.partCabins[i] === cabinIdx && !sd.partsFound[i]) {
+                var items = ['battery', 'antenna', 'fuse'];
+                var idx = i;
+                var noteText = sd.partNotes ? sd.partNotes[i] : null;
+                return {
+                    item: items[i],
+                    msg: 'Found ' + sd.partNames[i] + '!',
+                    callback: function() {
+                        sd.partsFound[idx] = true;
+                        var found = 0;
+                        for (var j = 0; j < 3; j++) { if (sd.partsFound[j]) found++; }
+                        sd.objectiveText = 'Gather radio parts. (' + found + '/3)';
+                        if (found === 3) sd.objectiveText = 'Bring parts to the relay station!';
+                        if (noteText) {
+                            self.readingNote = noteText;
+                            self._pendingNoteReveal = idx;
+                        }
+                    }
+                };
+            }
+        }
+    }
+    return null;
+};
+
+TWB.Game.prototype.dismissNote = function() {
+    this.readingNote = null;
+    if (this._pendingNoteReveal !== undefined && this._pendingNoteReveal !== null) {
+        var sd = TWB._scenarioData;
+        var scenario = this._pendingNoteScenario || TWB._scenario;
+        var idx = this._pendingNoteReveal;
+        if (scenario === 'RELAY' && sd.partNotes) {
+            sd.notesRead[idx] = true;
+            if (idx < 2) {
+                var nextCabin = sd.partCabins[idx + 1];
+                if (sd.revealedCabins.indexOf(nextCabin) === -1) sd.revealedCabins.push(nextCabin);
+                this.notification = { text: 'Map updated - new location marked.', timer: 150 };
+            } else {
+                if (sd.revealedCabins.indexOf(TWB._targetCabin) === -1) sd.revealedCabins.push(TWB._targetCabin);
+                this.notification = { text: 'Map updated - relay station marked!', timer: 150 };
+            }
+            this._mapCanvas = null;
+        } else if (scenario === 'RESCUE' && sd.clueNotes) {
+            sd.clueNotesRead[idx] = true;
+            if (idx < 2) {
+                var nextCabin = sd.clueCabins[idx + 1];
+                if (sd.revealedCabins.indexOf(nextCabin) === -1) sd.revealedCabins.push(nextCabin);
+                this.notification = { text: 'Map updated - new location marked.', timer: 150 };
+            } else {
+                if (sd.revealedCabins.indexOf(TWB._targetCabin) === -1) sd.revealedCabins.push(TWB._targetCabin);
+                this.notification = { text: 'Map updated - hiker\'s cabin marked!', timer: 150 };
+            }
+            this._mapCanvas = null;
+        }
+        this._pendingNoteReveal = null;
+        this._pendingNoteScenario = null;
+    }
+};
+
 TWB.Game.prototype.enterCabin = function() {
     var px = this.player.x;
     var py = this.player.y;
@@ -1746,10 +1937,37 @@ TWB.Game.prototype.enterCabin = function() {
     }
 
     if (nearestIdx === TWB._targetCabin) {
-        this.victory = true;
-        this.victoryTimer = 0;
-        this.menu = null;
-        return;
+        var canWin = false;
+        var sd = TWB._scenarioData;
+        if (TWB._scenario === 'RESCUE') {
+            canWin = sd.cluesFound[0] && sd.cluesFound[1] && sd.cluesFound[2] && this.getItemCount('flare') > 0;
+            if (!canWin && sd.cluesFound[2]) {
+                this.notification = { text: 'Use the flare outside the cabin!', timer: 150 };
+            } else if (!canWin) {
+                this.notification = { text: 'The cabin is empty... need more clues.', timer: 150 };
+            }
+        } else if (TWB._scenario === 'RELAY') {
+            canWin = this.getItemCount('battery') > 0 && this.getItemCount('antenna') > 0 && this.getItemCount('fuse') > 0;
+            if (!canWin) {
+                var missing = [];
+                if (this.getItemCount('battery') <= 0) missing.push('Battery');
+                if (this.getItemCount('antenna') <= 0) missing.push('Antenna');
+                if (this.getItemCount('fuse') <= 0) missing.push('Fuse');
+                this.notification = { text: 'Radio dead. Missing: ' + missing.join(', '), timer: 180 };
+            }
+        } else if (TWB._scenario === 'CURSE') {
+            canWin = this.getItemCount('relic') >= 3;
+            if (!canWin) {
+                this.notification = { text: 'A dark fog blocks the entrance... (' + this.getItemCount('relic') + '/3 relics)', timer: 150 };
+                return;
+            }
+        }
+        if (canWin) {
+            this.victory = true;
+            this.victoryTimer = 0;
+            this.menu = null;
+            return;
+        }
     }
 
     this.player.speed = TWB.PLAYER_SPEED;
@@ -1765,18 +1983,19 @@ TWB.Game.prototype.enterCabin = function() {
         wx: this.wolf.x, wy: this.wolf.y
     };
     this.objects = TWB.buildCabinInterior(nearestIdx);
-    this.player.x = 6 * 32;
-    this.player.y = 7 * 32;
+    this.player.x = 4 * 32;
+    this.player.y = 3 * 32;
     this.player.tx = this.player.x;
     this.player.ty = this.player.y;
     this.player.moving = false;
-    this.wolf.x = 7 * 32;
-    this.wolf.y = 7 * 32;
+    this.wolf.x = 5 * 32;
+    this.wolf.y = 3 * 32;
     this.wolf.tx = this.wolf.x;
     this.wolf.ty = this.wolf.y;
     this.wolf.moving = false;
     this.indoors = true;
     TWB.indoors = true;
+    this.runStats.cabinsVisited[this.currentCabinIdx] = true;
     this.menu = null;
     this.barricaded = false;
     this.cabinEventTimer = 0;
@@ -1785,6 +2004,19 @@ TWB.Game.prototype.enterCabin = function() {
     var cabinName = TWB.CABIN_TYPES[TWB._cabinData[nearestIdx].type].name;
     var cabDmg = TWB._cabinData[nearestIdx].damaged && !TWB._cabinData[nearestIdx].repaired;
     this.notification = { text: cabinName + (cabDmg ? ' (Damaged)' : ''), timer: 120 };
+    var sd = TWB._scenarioData;
+    var questCabins = null, questFound = null;
+    if (TWB._scenario === 'RELAY' && sd.partCabins) { questCabins = sd.partCabins; questFound = sd.partsFound; }
+    else if (TWB._scenario === 'RESCUE' && sd.clueCabins) { questCabins = sd.clueCabins; questFound = sd.cluesFound; }
+    if (questCabins) {
+        for (var qi = 0; qi < 3; qi++) {
+            if (questCabins[qi] === nearestIdx && !questFound[qi]) {
+                var dn = this.dogName || 'Dog';
+                this.notification = { text: cabinName + ' - ' + dn + ' sniffs around excitedly!', timer: 150 };
+                break;
+            }
+        }
+    }
     if (this.wolfSiege) {
         this.wolfSiege = false;
         this.wolfSiegePack = [];
@@ -1817,9 +2049,48 @@ TWB.Game.prototype.update = function() {
     if (this.fates && this.fates.fade >= 1) return;
     if (this.elderDialogue) return;
     if (this.stats.health <= 0 && !this.dead) {
-        this.dead = true;
-        this.deathTimer = 0;
-        this.deathCause = 'You succumbed to the wilderness.';
+        if (!this.knockoutUsed && !this.dogStolen && !this.indoors && this.wolfStats.health > 10) {
+            this.knockoutUsed = true;
+            this.knockoutActive = true;
+            this.knockoutTimer = 0;
+            this.stats.health = 15;
+            this.stats.energy = 10;
+            var bestCabin = null, bestCabDist2 = Infinity;
+            for (var kci = 0; kci < TWB._cabinData.length; kci++) {
+                var kc = TWB._cabinData[kci];
+                var kd = Math.sqrt(Math.pow(this.player.x - kc.cx * TWB.TILE, 2) + Math.pow(this.player.y - kc.cy * TWB.TILE, 2));
+                if (kd < bestCabDist2) { bestCabDist2 = kd; bestCabin = kci; }
+            }
+            if (bestCabin !== null) {
+                var kbc = TWB._cabinData[bestCabin];
+                this.player.x = kbc.cx * TWB.TILE;
+                this.player.y = (kbc.cy + 4) * TWB.TILE;
+                this.player.tx = this.player.x;
+                this.player.ty = this.player.y;
+                this.player.moving = false;
+                this.wolf.x = this.player.x + 20;
+                this.wolf.y = this.player.y + 10;
+                this.wolf.tx = this.wolf.x;
+                this.wolf.ty = this.wolf.y;
+                this.shadows = [];
+                this.predator = null;
+                this.fleeing = false;
+            }
+            this.notification = { text: (this.dogName || 'Dog') + ' dragged you to safety!', timer: 250 };
+        } else {
+            this.dead = true;
+            this.deathTimer = 0;
+            if (this.fleeing || this.predator) this.deathCause = 'A predator got you.';
+            else if (this.wolfSiege) this.deathCause = 'The wolves overwhelmed you.';
+            else if (this.shadowBreaching) this.deathCause = 'The shadows broke through.';
+            else if (this.shadows && this.shadows.length > 0) this.deathCause = 'The shadows consumed you.';
+            else if (this.stats.hunger <= 0) this.deathCause = 'You starved to death.';
+            else if (this.stats.thirst <= 0) this.deathCause = 'You died of dehydration.';
+            else if (this.raining && !this.indoors) this.deathCause = 'The cold rain drained your last strength.';
+            else if (this.shadowDebt >= 60) this.deathCause = 'The night took its toll.';
+            else if (this.stats.energy <= 0) this.deathCause = 'You collapsed from exhaustion.';
+            else this.deathCause = 'You succumbed to the wilderness.';
+        }
     }
     if (this.wolfStats.health <= 0 && !this.dead) {
         this.dead = true;
@@ -1829,6 +2100,7 @@ TWB.Game.prototype.update = function() {
     if (this.windowView) { this.windowView.frame++; return; }
     if (this.readingNote) return;
     this.player.update(this.objects);
+    if (this.player.moving) this.runStats.distWalked += this.player.speed / TWB.TILE;
 
     if (this.fleeing) {
         var cabin = null;
@@ -1869,6 +2141,7 @@ TWB.Game.prototype.update = function() {
             this.wolfHunting = null;
             this.addToBackpack('meat', prey.meat);
             this.wolfStats.mood = 'Happy';
+            this.runStats.animalsHunted++;
             this.notification = { text: (this.dogName || 'Dog') + ' caught a ' + prey.name + '! +' + prey.meat + ' meat', timer: 150 };
         } else if (this.wolfHuntTimer <= 0) {
             this.wolfHunting = null;
@@ -1892,7 +2165,7 @@ TWB.Game.prototype.update = function() {
         var nearShrine = false;
         for (var psi = 0; psi < this.objects.length; psi++) {
             var ps = this.objects[psi];
-            if (ps.type !== 'shrine' || !ps.lit) continue;
+            if ((ps.type !== 'shrine' && ps.type !== 'curse_shrine') || !ps.lit) continue;
             var psdx = this.predator.x - ps.x;
             var psdy = this.predator.y - ps.y;
             if (Math.sqrt(psdx * psdx + psdy * psdy) < 120) { nearShrine = true; break; }
@@ -1951,7 +2224,7 @@ TWB.Game.prototype.update = function() {
             var playerNearShrine = false;
             for (var dsi = 0; dsi < this.objects.length; dsi++) {
                 var dso = this.objects[dsi];
-                if (dso.type !== 'shrine' || !dso.lit) continue;
+                if ((dso.type !== 'shrine' && dso.type !== 'curse_shrine') || !dso.lit) continue;
                 var dsdx = this.player.x - dso.x;
                 var dsdy = this.player.y - dso.y;
                 if (Math.sqrt(dsdx * dsdx + dsdy * dsdy) < 120) { playerNearShrine = true; break; }
@@ -1968,6 +2241,7 @@ TWB.Game.prototype.update = function() {
                 angle: ds.angle + Math.PI
             };
             this.wolfStats.mood = 'Alert';
+            this.runStats.predators++;
             this.notification = { text: (this.dogName || 'Dog') + ' is barking! ' + ds.pred.name + '!', timer: 180 };
             this.dogSense = null;
             }
@@ -1999,6 +2273,7 @@ TWB.Game.prototype.update = function() {
     }
     this.fireTime++;
     this.gameTime++;
+    if (this.stats.health < this.runStats.lowestHP) this.runStats.lowestHP = this.stats.health;
 
     if (this.fireBuff > 0) this.fireBuff--;
     if (this.fireBuffFP > 0) this.fireBuffFP--;
@@ -2032,14 +2307,17 @@ TWB.Game.prototype.update = function() {
     }
 
     if ((this.fireBuffFP > 0 && this.indoors) || this.fireBuff > 0) {
+        if (this.stats.health < 100) {
+            this.stats.health = Math.min(100, this.stats.health + 0.005);
+        }
         if (this.wolfStats.health < 100) {
-            this.wolfStats.health = Math.min(100, this.wolfStats.health + 0.003);
+            this.wolfStats.health = Math.min(100, this.wolfStats.health + 0.005);
         }
     }
 
     if (this.gameTime % 600 === 0) {
         var drainMult = this.difficulty === 0 ? 0.7 : this.difficulty === 2 ? 1.4 : 1;
-        this.stats.energy = Math.max(0, this.stats.energy - 1 * drainMult);
+        this.stats.energy = Math.max(0, this.stats.energy - 0.5 * drainMult);
         this.stats.hunger = Math.max(0, this.stats.hunger - 0.8 * drainMult);
         this.stats.thirst = Math.max(0, this.stats.thirst - 1.0 * drainMult);
         if (!this.dogStolen) {
@@ -2054,6 +2332,11 @@ TWB.Game.prototype.update = function() {
     }
     if (!this.indoors && this.raining) {
         this.wetness = Math.min(100, this.wetness + 0.05);
+        if (this.gameTime % 1800 === 0 && this.getItemCount('canteen') > 0) {
+            this.removeFromBackpack('canteen', 1);
+            this.addToBackpack('canteen_full', 1);
+            this.notification = { text: 'Rain filled your canteen!', timer: 120 };
+        }
     } else if (this.indoors || (!this.raining && this.wetness > 0)) {
         var dryRate = this.indoors ? 0.15 : 0.03;
         this.wetness = Math.max(0, this.wetness - dryRate);
@@ -2129,6 +2412,7 @@ TWB.Game.prototype.update = function() {
             this.shadowBreaching = false;
         }
         if (!this.indoors) {
+            this.runStats.nightsOut++;
             var ntMsg = 'Darkness falls... find shelter!';
             if (this.nightType === 'freeze') ntMsg = 'A freezing storm approaches... find shelter!';
             else if (this.nightType === 'shadow_surge') ntMsg = 'The darkness feels alive tonight... find shelter!';
@@ -2146,6 +2430,8 @@ TWB.Game.prototype.update = function() {
     if (this.shadowDebt >= 20) baseSpawnRate = Math.floor(baseSpawnRate * 0.8);
     if (this.shadowDebt >= 60) baseSpawnRate = Math.floor(baseSpawnRate * 0.6);
     var shadowSpawnRate = isSurge ? Math.floor(baseSpawnRate * 0.5) : baseSpawnRate;
+    var relicCarried = this.getItemCount('relic');
+    if (relicCarried > 0) shadowSpawnRate = Math.floor(shadowSpawnRate * (1 - relicCarried * 0.15));
 
     if (this.nightActive && !this.indoors) {
         this.shadowSpawnTimer++;
@@ -2213,6 +2499,7 @@ TWB.Game.prototype.update = function() {
             if (sdist < 35 && sh.retreatTimer <= 0) {
                 this.stats.health = Math.max(0, this.stats.health - 0.05);
                 this.wolfStats.health = Math.max(0, this.wolfStats.health - 0.03);
+                this.runStats.shadowHits++;
             }
 
             var psDist = Math.sqrt(Math.pow(sh.x - this.player.x, 2) + Math.pow(sh.y - this.player.y, 2));
@@ -2602,10 +2889,16 @@ TWB.Game.prototype.update = function() {
     }
     if (this.stats.hunger <= 0 || this.stats.thirst <= 0) {
         this.starvationTimer++;
-        var starvMult = 1 + Math.floor(this.starvationTimer / 1800) * 0.5;
-        this.stats.health = Math.max(0, this.stats.health - 0.02 * starvMult);
+        if (this.starvationTimer < 1800) {
+            this.player.speed = TWB.PLAYER_SPEED * 0.7;
+        } else {
+            this.player.speed = TWB.PLAYER_SPEED * 0.7;
+            var starvMult = 1 + Math.floor((this.starvationTimer - 1800) / 1800) * 0.5;
+            this.stats.health = Math.max(0, this.stats.health - 0.02 * starvMult);
+        }
     } else {
         this.starvationTimer = 0;
+        if (!this.fleeing) this.player.speed = TWB.PLAYER_SPEED;
     }
     if (this.wolfStats.hunger <= 0 || this.wolfStats.thirst <= 0) {
         this.wolfStarvationTimer++;
@@ -2766,6 +3059,7 @@ TWB.Game.prototype.update = function() {
             if (hour >= 6 && hour < 22) {
                 this.raining = true;
                 this.rainTimer = 1800 + Math.floor(Math.random() * 5400);
+                this.runStats.storms++;
                 this.notification = { text: 'It started raining...', timer: 120 };
             } else {
                 this.rainTimer = 1800;
@@ -2789,6 +3083,7 @@ TWB.Game.prototype.update = function() {
             if (sHour >= 0 && sHour < 6 || sHour >= 16) {
                 this.snowing = true;
                 this.snowTimer = 2700 + Math.floor(Math.random() * 7200);
+                this.runStats.storms++;
                 this.notification = { text: 'It started snowing...', timer: 120 };
             } else {
                 this.snowTimer = 1800;
@@ -3009,6 +3304,24 @@ TWB.Game.prototype.render = function() {
                 }
             }
         }
+        var iw = TWB.INTERIOR_COLS * TWB.TILE;
+        var ih = TWB.INTERIOR_ROWS * TWB.TILE;
+        var wt = 6;
+        var stoneH = 44;
+        ctx.fillStyle = '#2a2420';
+        ctx.fillRect(-cam.x, -cam.y, iw, stoneH);
+        ctx.fillStyle = '#1e1a16';
+        for (var swi = 0; swi < TWB.INTERIOR_COLS; swi++) {
+            ctx.fillRect(swi * TWB.TILE - cam.x, 14 - cam.y, TWB.TILE, 2);
+            ctx.fillRect(swi * TWB.TILE - cam.x, 30 - cam.y, TWB.TILE, 2);
+            if (swi > 0) ctx.fillRect(swi * TWB.TILE - cam.x, -cam.y, 2, stoneH);
+        }
+        ctx.fillStyle = '#322a22';
+        ctx.fillRect(-cam.x, stoneH - 2 - cam.y, iw, 2);
+        ctx.fillStyle = '#3a3028';
+        ctx.fillRect(-cam.x, ih - wt - cam.y, iw, wt);
+        ctx.fillRect(-cam.x, stoneH - cam.y, wt, ih - stoneH);
+        ctx.fillRect(iw - wt - cam.x, stoneH - cam.y, wt, ih - stoneH);
     } else {
         var sc = Math.floor(cam.x / TWB.TILE) - 1;
         var sr = Math.floor(cam.y / TWB.TILE) - 1;
@@ -3082,7 +3395,9 @@ TWB.Game.prototype.render = function() {
     if (this.fogDensity > 0 && !this.indoors) this.drawFog();
     this.drawCold();
     if (this.distortion > 0.1 && this.indoors) this.drawDistortion();
+    if (TWB._scenario === 'CURSE' && !this.indoors) this.drawCurseEffects();
     this.drawClock();
+    this.drawObjective();
     this.drawHUD();
     if (this.backpackOpen) this.drawBackpack();
     if (this.craftingOpen) this.drawCrafting();
@@ -3143,6 +3458,35 @@ TWB.Game.prototype.drawObject = function(obj) {
                 ctx.globalAlpha = 1;
                 ctx.restore();
             }
+        }
+    }
+
+    if (obj.type === 'curse_shrine') {
+        if (obj.lit) {
+            var flk = 0.5 + Math.sin(this.fireTime * 0.1) * 0.3;
+            ctx.save();
+            ctx.globalAlpha = flk;
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.fillStyle = '#6020a0';
+            ctx.fillRect(dx + 12, dy + 16, 8, 3);
+            ctx.fillStyle = '#8040c0';
+            ctx.fillRect(dx + 13, dy + 13, 6, 3);
+            var glow2 = ctx.createRadialGradient(dx + 16, dy + 20, 0, dx + 16, dy + 20, 30);
+            glow2.addColorStop(0, 'rgba(80,20,160,0.4)');
+            glow2.addColorStop(1, 'rgba(80,20,160,0)');
+            ctx.fillStyle = glow2;
+            ctx.fillRect(dx - 14, dy - 10, 60, 60);
+            ctx.restore();
+        } else {
+            var pulse = 0.15 + Math.sin(this.fireTime * 0.04) * 0.1;
+            ctx.save();
+            ctx.globalAlpha = pulse;
+            var dGlow = ctx.createRadialGradient(dx + 16, dy + 22, 0, dx + 16, dy + 22, 20);
+            dGlow.addColorStop(0, 'rgba(60,10,80,0.5)');
+            dGlow.addColorStop(1, 'rgba(60,10,80,0)');
+            ctx.fillStyle = dGlow;
+            ctx.fillRect(dx - 4, dy + 2, 40, 40);
+            ctx.restore();
         }
     }
 
@@ -3225,7 +3569,7 @@ TWB.Game.prototype.drawFire = function() {
 
     for (var si = 0; si < this.objects.length; si++) {
         var shr = this.objects[si];
-        if (shr.type !== 'shrine' || !shr.lit) continue;
+        if ((shr.type !== 'shrine' && shr.type !== 'curse_shrine') || !shr.lit) continue;
         var sx = Math.floor(shr.x - this.camera.x);
         var sy = Math.floor(shr.y - this.camera.y) - 16;
         if (sx < -100 || sx > this.canvas.width + 100 || sy < -100 || sy > this.canvas.height + 100) continue;
@@ -3321,7 +3665,7 @@ TWB.Game.prototype.getTemperatureBreakdown = function() {
     if (!this.indoors) {
         for (var swi = 0; swi < this.objects.length; swi++) {
             var sw = this.objects[swi];
-            if (sw.type !== 'shrine' || !sw.lit) continue;
+            if ((sw.type !== 'shrine' && sw.type !== 'curse_shrine') || !sw.lit) continue;
             var swdx = this.player.x - sw.x;
             var swdy = this.player.y - sw.y;
             if (Math.sqrt(swdx * swdx + swdy * swdy) < 100) { shrineWarmth = 4; break; }
@@ -3512,7 +3856,7 @@ TWB.Game.prototype.drawElderDialogue = function() {
         ctx.fillText(lines[li], px + 12, py + 24 + li * 12);
     }
 
-    ctx.font = '6px "Press Start 2P", monospace';
+    ctx.font = '7px "Press Start 2P", monospace';
     ctx.fillStyle = '#5a5030';
     ctx.textAlign = 'center';
     ctx.fillText('click or [E] to close', px + pw / 2, py + ph - 12);
@@ -3549,6 +3893,55 @@ TWB.Game.prototype.drawCloseBtn = function(x, y) {
     ctx.beginPath(); ctx.moveTo(x + s - 3, y + 3); ctx.lineTo(x + 3, y + s - 3); ctx.stroke();
 };
 
+TWB.Game.prototype.drawObjective = function() {
+    var sd = TWB._scenarioData;
+    if (!sd.objectiveText) return;
+    var ctx = this.ctx;
+    ctx.save();
+    ctx.font = '7px "Press Start 2P", monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    var tw = ctx.measureText(sd.objectiveText).width;
+    ctx.fillRect(4, 42, tw + 10, 14);
+    ctx.fillStyle = '#b8a060';
+    ctx.fillText(sd.objectiveText, 9, 46);
+    ctx.restore();
+};
+
+TWB.Game.prototype.drawCurseEffects = function() {
+    var ctx = this.ctx;
+    var cam = this.camera;
+    var sd = TWB._scenarioData;
+    if (!sd.shrineCabin) return;
+    var tc = TWB._cabinData[sd.shrineCabin];
+    if (!tc) return;
+    var tcx = Math.floor(tc.cx * TWB.TILE - cam.x);
+    var tcy = Math.floor(tc.cy * TWB.TILE - cam.y);
+    if (tcx > -200 && tcx < this.canvas.width + 200 && tcy > -200 && tcy < this.canvas.height + 200) {
+        var pulse = 0.12 + Math.sin(this.fireTime * 0.02) * 0.06;
+        var grad = ctx.createRadialGradient(tcx, tcy, 20, tcx, tcy, 150);
+        grad.addColorStop(0, 'rgba(60,10,80,' + pulse.toFixed(2) + ')');
+        grad.addColorStop(0.5, 'rgba(40,5,60,' + (pulse * 0.5).toFixed(2) + ')');
+        grad.addColorStop(1, 'rgba(40,5,60,0)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(tcx - 150, tcy - 150, 300, 300);
+    }
+    var relics = this.getItemCount('relic');
+    if (relics > 0) {
+        var dist = relics * 0.02;
+        var shiftX = Math.sin(this.fireTime * 0.07) * dist * 3;
+        var shiftY = Math.cos(this.fireTime * 0.09) * dist * 2;
+        ctx.save();
+        ctx.globalAlpha = 0.06 * relics;
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.drawImage(this.canvas, shiftX, shiftY);
+        ctx.restore();
+        ctx.fillStyle = 'rgba(40,0,60,' + (0.03 * relics).toFixed(2) + ')';
+        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    }
+};
+
 TWB.Game.prototype.drawClock = function() {
     var ctx = this.ctx;
     var totalMinutes = Math.floor(this.gameTime / 60);
@@ -3559,7 +3952,13 @@ TWB.Game.prototype.drawClock = function() {
     var hour = this.getGameHour();
     var period = hour < 6 ? 'NIGHT' : hour < 9 ? 'DAWN' : hour < 12 ? 'MORNING' : hour < 18 ? 'AFTERNOON' : hour < 21 ? 'DUSK' : 'NIGHT';
 
-    var boxW = 90;
+    var periodSuffix = this.raining ? ' RAIN' : (this.snowing ? ' SNOW' : '');
+    if (this.nightActive && this.nightType === 'freeze') periodSuffix = ' STORM';
+    else if (this.nightActive && this.nightType === 'shadow_surge') periodSuffix = ' DARK';
+    var periodStr = period + periodSuffix;
+    ctx.font = '8px "Press Start 2P", monospace';
+    var periodW = ctx.measureText(periodStr).width;
+    var boxW = Math.max(90, periodW + 16);
     var cx = this.canvas.width - boxW - 8;
     var cy = 12;
 
@@ -3651,10 +4050,7 @@ TWB.Game.prototype.drawClock = function() {
     ctx.font = '8px "Press Start 2P", monospace';
     var periodColor = hour < 5 ? '#4060a0' : hour < 7 ? '#d08040' : hour < 12 ? '#a0a060' : hour < 17 ? '#c0b060' : hour < 20 ? '#c08030' : '#4060a0';
     ctx.fillStyle = periodColor;
-    var periodSuffix = this.raining ? ' RAIN' : (this.snowing ? ' SNOW' : '');
-    if (this.nightActive && this.nightType === 'freeze') periodSuffix = ' STORM';
-    else if (this.nightActive && this.nightType === 'shadow_surge') periodSuffix = ' DARK';
-    ctx.fillText(period + periodSuffix, cx, cy + 16);
+    ctx.fillText(periodStr, cx, cy + 16);
 
     var temp = this.getTemperature();
     var exposure = this.getExposureState();
@@ -3672,7 +4068,7 @@ TWB.Game.prototype.drawClock = function() {
     ctx.fillStyle = expColors[exposure.level];
     ctx.fillText(temp + '°C', tx, ty);
     if (exposure.level > 0) {
-        ctx.font = '5px "Press Start 2P", monospace';
+        ctx.font = '7px "Press Start 2P", monospace';
         ctx.fillText(exposure.label, tx, ty + 14);
     }
 
@@ -3796,6 +4192,15 @@ TWB.Game.prototype.drawLighting = function() {
         glow.addColorStop(1, 'rgba(0,0,0,0)');
         lctx.fillStyle = glow;
         lctx.fillRect(px - 35, py - 35, 70, 70);
+    } else if (!this.indoors && overlayA > 0.3) {
+        var ep = this.player;
+        var epx = Math.floor(ep.x - this.camera.x);
+        var epy = Math.floor(ep.y - this.camera.y);
+        var emGlow = lctx.createRadialGradient(epx, epy, 0, epx, epy, 20);
+        emGlow.addColorStop(0, 'rgba(0,0,0,0.15)');
+        emGlow.addColorStop(1, 'rgba(0,0,0,0)');
+        lctx.fillStyle = emGlow;
+        lctx.fillRect(epx - 20, epy - 20, 40, 40);
     }
 
     if (!this.indoors && this.fireFuel > 0) {
@@ -3833,7 +4238,7 @@ TWB.Game.prototype.drawLighting = function() {
     if (!this.indoors) {
         for (var sli = 0; sli < this.objects.length; sli++) {
             var sl = this.objects[sli];
-            if (sl.type !== 'shrine' || !sl.lit) continue;
+            if ((sl.type !== 'shrine' && sl.type !== 'curse_shrine') || !sl.lit) continue;
             var slx = Math.floor(sl.x - this.camera.x);
             var sly = Math.floor(sl.y - this.camera.y) - 10;
             var slR = 50 + Math.min(1, sl.litFuel / 200) * 30;
@@ -4294,6 +4699,7 @@ TWB.Game.prototype.tryCraft = function(idx) {
     for (var i = 0; i < recipe.needs.length; i++) {
         this.removeFromBackpack(recipe.needs[i][0], recipe.needs[i][1]);
     }
+    this.runStats.itemsCrafted++;
     this.notification = { text: 'Crafted ' + recipe.label + '!', timer: 120 };
 };
 
@@ -4411,16 +4817,14 @@ TWB.Game.prototype.drawNotification = function() {
     ctx.textBaseline = 'middle';
 
     var tx = this.canvas.width / 2;
-    var ty = this.canvas.height - 82;
+    var ty = this.canvas.height * 0.38;
 
     var isWarning = n.text === 'Too tired...' || n.text === 'Backpack is full!';
     var color = isWarning ? '#e05050' : '#d4a44a';
 
-    if (isWarning) {
-        ctx.fillStyle = 'rgba(80,20,20,0.7)';
-        var tw = ctx.measureText(n.text).width;
-        ctx.fillRect(tx - tw / 2 - 8, ty - 10, tw + 16, 22);
-    }
+    var tw = ctx.measureText(n.text).width;
+    ctx.fillStyle = isWarning ? 'rgba(80,20,20,0.75)' : 'rgba(0,0,0,0.6)';
+    ctx.fillRect(tx - tw / 2 - 10, ty - 12, tw + 20, 26);
 
     ctx.fillStyle = '#000';
     ctx.fillText(n.text, tx + 1, ty + 1);
@@ -4517,7 +4921,7 @@ TWB.Game.prototype.drawMap = function() {
             ctx.beginPath();
             ctx.arc(qshx, qshy, 6, 0, Math.PI * 2);
             ctx.stroke();
-            ctx.font = '6px "Press Start 2P", monospace';
+            ctx.font = '7px "Press Start 2P", monospace';
             ctx.textAlign = 'center';
             ctx.fillText(qsh.lit ? '✓' : '?', qshx, qshy + 2);
             ctx.restore();
@@ -4539,6 +4943,158 @@ TWB.Game.prototype.drawMap = function() {
             ctx.font = 'italic 7px Georgia, serif';
             ctx.textAlign = 'center';
             ctx.fillText(this.dogName || 'Dog', qdmx, qdmy - 10);
+            ctx.restore();
+        }
+    }
+
+    var sd = TWB._scenarioData;
+    if (sd && !this.dogStolen) {
+        var sPad = 24, sBw = 10;
+        var smX = sPad + sBw, smY = sPad + sBw;
+        var smW = cw - (sPad + sBw) * 2, smH = ch - (sPad + sBw) * 2;
+        var ssx = smW / TWB.COLS, ssy = smH / TWB.ROWS;
+
+        if (TWB._scenario === 'RESCUE' && sd.clueCabins) {
+            for (var rci = 0; rci < 3; rci++) {
+                if (sd.cluesFound[rci]) {
+                    var rc = TWB._cabinData[sd.clueCabins[rci]];
+                    if (!rc) continue;
+                    var rcx = smX + rc.cx * ssx, rcy = smY + rc.cy * ssy;
+                    ctx.save();
+                    ctx.fillStyle = '#4090d0';
+                    ctx.strokeStyle = '#3070b0';
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.arc(rcx, rcy, 5, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+                    ctx.font = '7px "Press Start 2P", monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillStyle = '#fff';
+                    ctx.fillText('✓', rcx, rcy + 2);
+                    ctx.restore();
+                }
+            }
+            if (sd.revealedCabins) {
+                for (var rvi = 0; rvi < sd.revealedCabins.length; rvi++) {
+                    var rvIdx = sd.revealedCabins[rvi];
+                    var alreadyFound = false;
+                    for (var rci2 = 0; rci2 < 3; rci2++) {
+                        if (sd.clueCabins[rci2] === rvIdx && sd.cluesFound[rci2]) { alreadyFound = true; break; }
+                    }
+                    if (rvIdx === TWB._targetCabin) alreadyFound = false;
+                    if (alreadyFound) continue;
+                    var rvc = TWB._cabinData[rvIdx];
+                    if (!rvc) continue;
+                    var rvx = smX + rvc.cx * ssx, rvy = smY + rvc.cy * ssy;
+                    var rvPulse = 0.5 + Math.sin(this.fireTime * 0.06 + rvi * 2) * 0.3;
+                    ctx.save();
+                    ctx.strokeStyle = 'rgba(200,80,80,' + rvPulse + ')';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([3, 3]);
+                    ctx.beginPath();
+                    ctx.arc(rvx, rvy, 7, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    ctx.font = '7px "Press Start 2P", monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillStyle = '#d04040';
+                    ctx.fillText('?', rvx, rvy + 2);
+                    ctx.restore();
+                }
+            }
+        } else if (TWB._scenario === 'RELAY' && sd.partCabins) {
+            for (var rpi = 0; rpi < 3; rpi++) {
+                if (sd.partsFound[rpi]) {
+                    var rpc = TWB._cabinData[sd.partCabins[rpi]];
+                    if (!rpc) continue;
+                    var rpx = smX + rpc.cx * ssx, rpy = smY + rpc.cy * ssy;
+                    ctx.save();
+                    ctx.fillStyle = '#40d060';
+                    ctx.strokeStyle = '#30b050';
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.arc(rpx, rpy, 5, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+                    ctx.font = '7px "Press Start 2P", monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillStyle = '#fff';
+                    ctx.fillText('✓', rpx, rpy + 2);
+                    ctx.restore();
+                }
+            }
+            if (sd.revealedCabins) {
+                for (var rvi = 0; rvi < sd.revealedCabins.length; rvi++) {
+                    var rvIdx = sd.revealedCabins[rvi];
+                    var alreadyFound = false;
+                    for (var rpi2 = 0; rpi2 < 3; rpi2++) {
+                        if (sd.partCabins[rpi2] === rvIdx && sd.partsFound[rpi2]) { alreadyFound = true; break; }
+                    }
+                    if (rvIdx === TWB._targetCabin) alreadyFound = false;
+                    if (alreadyFound) continue;
+                    var rvc = TWB._cabinData[rvIdx];
+                    if (!rvc) continue;
+                    var rvx = smX + rvc.cx * ssx, rvy = smY + rvc.cy * ssy;
+                    var rvPulse = 0.5 + Math.sin(this.fireTime * 0.06 + rvi * 2) * 0.3;
+                    ctx.save();
+                    ctx.strokeStyle = 'rgba(200,80,80,' + rvPulse + ')';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([3, 3]);
+                    ctx.beginPath();
+                    ctx.arc(rvx, rvy, 7, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    ctx.font = '7px "Press Start 2P", monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillStyle = '#d04040';
+                    ctx.fillText('?', rvx, rvy + 2);
+                    ctx.restore();
+                }
+            }
+        } else if (TWB._scenario === 'CURSE' && sd.curseShrines) {
+            for (var csi = 0; csi < sd.curseShrines.length; csi++) {
+                var cs = sd.curseShrines[csi];
+                var csx = smX + cs.tx * ssx, csy = smY + cs.ty * ssy;
+                ctx.save();
+                var csPulse = 0.5 + Math.sin(this.fireTime * 0.05 + csi * 2) * 0.3;
+                if (cs.relicTaken) {
+                    ctx.fillStyle = '#d4a44a';
+                    ctx.strokeStyle = '#c09030';
+                } else if (cs.lit) {
+                    ctx.fillStyle = 'rgba(120,40,200,' + csPulse + ')';
+                    ctx.strokeStyle = '#8030c0';
+                } else {
+                    ctx.fillStyle = 'rgba(80,20,120,' + csPulse + ')';
+                    ctx.strokeStyle = '#601080';
+                }
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.arc(csx, csy, 6, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.font = '7px "Press Start 2P", monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(cs.relicTaken ? '✓' : '?', csx, csy + 2);
+                ctx.restore();
+            }
+        }
+
+        var tc = TWB._cabinData[TWB._targetCabin];
+        if (tc) {
+            var tcmx = smX + tc.cx * ssx, tcmy = smY + tc.cy * ssy;
+            var tcPulse = 0.5 + Math.sin(this.fireTime * 0.06) * 0.3;
+            ctx.save();
+            ctx.strokeStyle = TWB._scenario === 'CURSE' ? 'rgba(120,30,180,' + tcPulse + ')' : 'rgba(200,160,60,' + tcPulse + ')';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([3, 3]);
+            ctx.beginPath();
+            ctx.arc(tcmx, tcmy, 8, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.font = '7px "Press Start 2P", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = TWB._scenario === 'CURSE' ? '#a040d0' : '#d4a44a';
+            ctx.fillText('★', tcmx, tcmy + 2);
             ctx.restore();
         }
     }
@@ -4569,6 +5125,27 @@ TWB.Game.prototype.drawMap = function() {
         ctx.textAlign = 'center';
         ctx.fillStyle = '#6a5a40';
         ctx.fillText('Fog... last known position', cw / 2, ch - 30);
+        ctx.restore();
+    }
+
+    if (this.showPlayerOnMap) {
+        var mPad = 24, mBw = 10;
+        var pmX = mPad + mBw, pmY = mPad + mBw;
+        var pmW = cw - (mPad + mBw) * 2, pmH = ch - (mPad + mBw) * 2;
+        var pmsx = pmW / TWB.COLS, pmsy = pmH / TWB.ROWS;
+        var ppx = pmX + (this.player.x / TWB.TILE) * pmsx;
+        var ppy = pmY + (this.player.y / TWB.TILE) * pmsy;
+        var bPulse = 0.5 + Math.sin(this.fireTime * 0.1) * 0.5;
+        ctx.save();
+        ctx.fillStyle = 'rgba(60,140,255,' + bPulse + ')';
+        ctx.beginPath();
+        ctx.arc(ppx, ppy, 4 + Math.sin(this.fireTime * 0.1) * 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#4090ff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(ppx, ppy, 8 + Math.sin(this.fireTime * 0.08) * 3, 0, Math.PI * 2);
+        ctx.stroke();
         ctx.restore();
     }
 
@@ -4938,7 +5515,7 @@ TWB.Game.prototype._renderMapStatic = function(ctx, cw, ch) {
 
     for (var sri = 0; sri < this.objects.length; sri++) {
         var sro = this.objects[sri];
-        if (sro.type !== 'shrine') continue;
+        if (sro.type !== 'shrine' && sro.type !== 'curse_shrine') continue;
         var srh2 = TWB.hash(Math.floor(sro.x) * 13, Math.floor(sro.y) * 17);
         var srx2 = mapX + (sro.x / TWB.TILE) * sx + ((srh2 % 21) - 10) * sx;
         var sry2 = mapY + (sro.y / TWB.TILE) * sy + (((srh2 >>> 8) % 21) - 10) * sy;
@@ -5138,12 +5715,12 @@ TWB.Game.prototype._renderMapStatic = function(ctx, cw, ch) {
         ctx.fill();
     }
 
-    ctx.font = 'bold 7px Georgia, serif';
+    ctx.font = 'bold 8px Georgia, serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = ink;
     ctx.fillText('N', crx, cry3 - crs - 8);
-    ctx.font = '5px Georgia, serif';
+    ctx.font = '7px Georgia, serif';
     ctx.fillText('S', crx, cry3 + crs + 8);
     ctx.fillText('E', crx + crs + 8, cry3);
     ctx.fillText('W', crx - crs - 8, cry3);
@@ -5154,7 +5731,7 @@ TWB.Game.prototype._renderMapStatic = function(ctx, cw, ch) {
     ctx.fillStyle = ink;
     ctx.fillText('THE WAY BACK', cw / 2, pad - 4);
 
-    ctx.font = '6px "Press Start 2P", monospace';
+    ctx.font = '7px "Press Start 2P", monospace';
     ctx.fillStyle = inkL;
     ctx.fillText('[M] Close', cw / 2, ch - pad + 14);
     ctx.textAlign = 'left';
@@ -5217,7 +5794,7 @@ TWB.Game.prototype.drawBackpack = function() {
             ctx.beginPath();
             ctx.rect(bx + 1, by + 1, l.slotSize - 2, l.slotSize - 2);
             ctx.clip();
-            ctx.font = '6px "Press Start 2P", monospace';
+            ctx.font = '7px "Press Start 2P", monospace';
             var words = label.split(' ');
             if (words.length > 1) {
                 ctx.fillText(words[0], bx + l.slotSize / 2, by + 28);
@@ -5237,14 +5814,19 @@ TWB.Game.prototype.drawBackpack = function() {
     if (btns.length > 0) {
         var totalRows = Math.ceil(this.backpack.length / l.cols);
         var baseY = l.slotsY + totalRows * (l.slotSize + l.gap) + 4;
-        var btnW = 70;
+        var btnW = 80;
         var btnH = 20;
         var gapX = 12;
         var gapY = 6;
         var startX = l.px + Math.floor((l.pw - btnW * 2 - gapX) / 2);
-        var btnLabels = { eat: 'Eat', feed: 'Feed ' + (this.dogName || 'Wolf'), drop1: 'Drop 1', dropall: 'Drop All', drink_canteen: 'Drink', use_bandage: 'Use' };
+        var dName = (this.dogName || 'Dog');
+        if (dName.length > 6) dName = dName.substring(0, 5) + '.';
+        var btnLabels = { eat: 'Eat', feed: 'Feed ' + dName, drop1: 'Drop 1', dropall: 'Drop All', drink_canteen: 'Drink', dog_drink_canteen: 'Give ' + dName, use_bandage: 'Use' };
         var btnColors = { eat: ['#103a18', '#1a4a24', '#40c060', '#60e080'],
                           feed: ['#18283a', '#203848', '#4090c0', '#60b0e0'],
+                          drink_canteen: ['#103a18', '#1a4a24', '#40c060', '#60e080'],
+                          dog_drink_canteen: ['#18283a', '#203848', '#4090c0', '#60b0e0'],
+                          use_bandage: ['#103a18', '#1a4a24', '#40c060', '#60e080'],
                           drop1: ['#1a1018', '#3a2020', '#a04040', '#e06060'],
                           dropall: ['#1a1018', '#3a2020', '#a04040', '#e06060'] };
 
@@ -5255,7 +5837,7 @@ TWB.Game.prototype.drawBackpack = function() {
             var bx = startX + col * (btnW + gapX);
             var by = baseY + row * (btnH + gapY);
             var hovered = this.backpackBtnHover === btns[bi];
-            var c = btnColors[btns[bi]];
+            var c = btnColors[btns[bi]] || ['#1a2a1a', '#2a3a2a', '#60a060', '#80c080'];
             ctx.fillStyle = hovered ? c[1] : c[0];
             ctx.fillRect(bx, by, btnW, btnH);
             ctx.strokeStyle = c[2];
@@ -5555,8 +6137,8 @@ TWB.Game.prototype.drawNote = function() {
     ctx.fillStyle = 'rgba(0,0,0,0.75)';
     ctx.fillRect(0, 0, cw, ch);
 
-    var pw = 340;
-    var ph = 180;
+    var pw = 380;
+    var ph = 200;
     var px = Math.floor((cw - pw) / 2);
     var py = Math.floor((ch - ph) / 2) - 20;
 
@@ -5569,7 +6151,7 @@ TWB.Game.prototype.drawNote = function() {
     ctx.lineWidth = 1;
     ctx.strokeRect(px, py, pw, ph);
 
-    ctx.font = '10px "Press Start 2P", monospace';
+    ctx.font = '9px "Press Start 2P", monospace';
     ctx.fillStyle = '#a09880';
     ctx.textAlign = 'center';
 
@@ -5608,33 +6190,66 @@ TWB.Game.prototype.drawVictory = function() {
     ctx.fillStyle = '#d4a44a';
     ctx.font = '24px "Press Start 2P", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('YOU MADE IT', w / 2, h / 2 - 80);
+
+    var victoryTitle = 'YOU MADE IT';
+    var victoryMsg = 'You found the way back.';
+    if (TWB._scenario === 'RESCUE') {
+        victoryTitle = 'HIKER FOUND';
+        victoryMsg = 'The flare lit the sky. Rescue is on the way.';
+    } else if (TWB._scenario === 'RELAY') {
+        victoryTitle = 'SIGNAL SENT';
+        victoryMsg = 'The radio crackles to life. Help is coming.';
+    } else if (TWB._scenario === 'CURSE') {
+        victoryTitle = 'CURSE BROKEN';
+        victoryMsg = 'The relics glow and the fog lifts.';
+    }
+    ctx.fillText(victoryTitle, w / 2, h / 2 - 140);
 
     ctx.fillStyle = '#c8c8d0';
     ctx.font = '10px "Press Start 2P", monospace';
-    ctx.fillText('You found the way back.', w / 2, h / 2 - 40);
+    ctx.fillText(victoryMsg, w / 2, h / 2 - 100);
 
     if (t > 0.6) {
         var statA = Math.min(1, (t - 0.6) / 0.3);
         ctx.globalAlpha = statA;
 
-        ctx.fillStyle = '#8a8a9a';
+        ctx.fillStyle = '#a0a0b0';
         ctx.font = '8px "Press Start 2P", monospace';
-        ctx.fillText('Survived ' + dayStr, w / 2, h / 2 + 10);
-        ctx.fillText('Health: ' + Math.round(this.stats.health) + '%', w / 2, h / 2 + 30);
-        ctx.fillText((this.dogName || 'Dog') + ' HP: ' + Math.round(this.wolfStats.health) + '%', w / 2, h / 2 + 50);
+        ctx.fillText('Survived ' + dayStr, w / 2, h / 2 - 65);
 
-        var fireCount = 0;
-        for (var i = 0; i < this.objects.length; i++) {
-            if (this.objects[i].type === 'campfire' && this.objects[i].tempFuel !== undefined) fireCount++;
-        }
-        ctx.fillText('Fires lit: ' + fireCount, w / 2, h / 2 + 70);
+        ctx.fillStyle = '#8a8a9a';
+        ctx.font = '7px "Press Start 2P", monospace';
+        var rs = this.runStats;
+        var cabCount = Object.keys(rs.cabinsVisited).length;
+        var dist = Math.round(rs.distWalked);
+        var distStr = dist >= 1000 ? (dist / 1000).toFixed(1) + ' km' : dist + ' m';
+        var lCol = w / 2 - 160;
+        var rCol = w / 2 + 20;
+        var sy = h / 2 - 40;
+        var lh = 16;
+        ctx.textAlign = 'left';
+        ctx.fillText('Cabins visited: ' + cabCount, lCol, sy);
+        ctx.fillText('Distance walked: ' + distStr, lCol, sy + lh);
+        ctx.fillText('Meals eaten: ' + rs.mealsEaten, lCol, sy + lh * 2);
+        ctx.fillText('Items crafted: ' + rs.itemsCrafted, lCol, sy + lh * 3);
+        ctx.fillText('Animals hunted: ' + rs.animalsHunted, lCol, sy + lh * 4);
+        ctx.fillText('Predator encounters: ' + rs.predators, lCol, sy + lh * 5);
+        ctx.fillText('Nights outdoors: ' + rs.nightsOut, lCol, sy + lh * 6);
+
+        ctx.fillText('Shadow attacks: ' + rs.shadowHits, rCol, sy);
+        ctx.fillText('Lowest HP: ' + Math.round(rs.lowestHP) + '%', rCol, sy + lh);
+        ctx.fillText('Dog fed: ' + rs.dogFed, rCol, sy + lh * 2);
+        ctx.fillText('Wood burned: ' + rs.woodBurned, rCol, sy + lh * 3);
+        ctx.fillText('Storms weathered: ' + rs.storms, rCol, sy + lh * 4);
+        ctx.fillText('Items found: ' + rs.itemsFound, rCol, sy + lh * 5);
+        ctx.fillText('Health: ' + Math.round(this.stats.health) + '%', rCol, sy + lh * 6);
+        ctx.textAlign = 'center';
     }
 
     if (t >= 1) {
         ctx.fillStyle = '#6a6a7a';
         ctx.font = '8px "Press Start 2P", monospace';
-        ctx.fillText('Press R to play again', w / 2, h / 2 + 120);
+        ctx.fillText('Press R to play again', w / 2, h / 2 + 90);
     }
 
     ctx.restore();
@@ -5662,25 +6277,52 @@ TWB.Game.prototype.drawDeath = function() {
     ctx.fillStyle = '#8a2020';
     ctx.font = '24px "Press Start 2P", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('YOU PERISHED', w / 2, h / 2 - 80);
+    ctx.fillText('YOU PERISHED', w / 2, h / 2 - 140);
 
     ctx.fillStyle = '#c8a0a0';
     ctx.font = '10px "Press Start 2P", monospace';
-    ctx.fillText(this.deathCause, w / 2, h / 2 - 40);
+    ctx.fillText(this.deathCause, w / 2, h / 2 - 100);
 
     if (t > 0.6) {
         var statA = Math.min(1, (t - 0.6) / 0.3);
         ctx.globalAlpha = statA;
 
-        ctx.fillStyle = '#8a6a6a';
+        ctx.fillStyle = '#9a7a7a';
         ctx.font = '8px "Press Start 2P", monospace';
-        ctx.fillText('Survived ' + dayStr, w / 2, h / 2 + 10);
+        ctx.fillText('Survived ' + dayStr, w / 2, h / 2 - 65);
+
+        ctx.fillStyle = '#8a6a6a';
+        ctx.font = '7px "Press Start 2P", monospace';
+        var rs = this.runStats;
+        var cabCount = Object.keys(rs.cabinsVisited).length;
+        var dist = Math.round(rs.distWalked);
+        var distStr = dist >= 1000 ? (dist / 1000).toFixed(1) + ' km' : dist + ' m';
+        var lCol = w / 2 - 160;
+        var rCol = w / 2 + 20;
+        var sy = h / 2 - 40;
+        var lh = 16;
+        ctx.textAlign = 'left';
+        ctx.fillText('Cabins visited: ' + cabCount, lCol, sy);
+        ctx.fillText('Distance walked: ' + distStr, lCol, sy + lh);
+        ctx.fillText('Meals eaten: ' + rs.mealsEaten, lCol, sy + lh * 2);
+        ctx.fillText('Items crafted: ' + rs.itemsCrafted, lCol, sy + lh * 3);
+        ctx.fillText('Animals hunted: ' + rs.animalsHunted, lCol, sy + lh * 4);
+        ctx.fillText('Predator encounters: ' + rs.predators, lCol, sy + lh * 5);
+        ctx.fillText('Nights outdoors: ' + rs.nightsOut, lCol, sy + lh * 6);
+
+        ctx.fillText('Shadow attacks: ' + rs.shadowHits, rCol, sy);
+        ctx.fillText('Lowest HP: ' + Math.round(rs.lowestHP) + '%', rCol, sy + lh);
+        ctx.fillText('Dog fed: ' + rs.dogFed, rCol, sy + lh * 2);
+        ctx.fillText('Wood burned: ' + rs.woodBurned, rCol, sy + lh * 3);
+        ctx.fillText('Storms weathered: ' + rs.storms, rCol, sy + lh * 4);
+        ctx.fillText('Items found: ' + rs.itemsFound, rCol, sy + lh * 5);
+        ctx.textAlign = 'center';
     }
 
     if (t >= 1) {
         ctx.fillStyle = '#6a4a4a';
         ctx.font = '8px "Press Start 2P", monospace';
-        ctx.fillText('Press R to try again', w / 2, h / 2 + 120);
+        ctx.fillText('Press R to try again', w / 2, h / 2 + 90);
     }
 
     ctx.restore();
@@ -5869,7 +6511,7 @@ TWB.Game.prototype.drawHUD = function() {
         ctx.fillText('MISSING', 572, hudY + 22);
         if (this.questRevealed) {
             ctx.fillStyle = '#c08820';
-            ctx.fillText('LOCATION KNOWN', 572, hudY + 36);
+            ctx.fillText('TRACKED', 572, hudY + 36);
         } else {
             ctx.fillStyle = '#606068';
             ctx.fillText('Shrines: ' + this.questShrinesLit + '/3', 572, hudY + 36);
@@ -5888,20 +6530,21 @@ TWB.Game.prototype.drawHUD = function() {
         ctx.fillStyle = '#d4a44a';
         var wx = 572;
         ctx.fillText(this.dogName || 'WOLF', wx, hudY + 5);
-        this.drawBar(ctx, wx, hudY + 17, 70, 6, ws.health, '#4a1010', '#b83030');
-        this.drawBar(ctx, wx, hudY + 27, 70, 6, ws.energy, '#0a3a18', '#20a040');
-        this.drawBar(ctx, wx, hudY + 37, 70, 6, ws.hunger, '#3a2a08', '#c08820');
-        this.drawBar(ctx, wx, hudY + 47, 70, 6, ws.thirst, '#0a2a3a', '#2080c0');
-        ctx.font = '8px "Press Start 2P", monospace';
+        this.drawBar(ctx, wx, hudY + 17, 60, 6, ws.health, '#4a1010', '#b83030');
+        this.drawBar(ctx, wx, hudY + 27, 60, 6, ws.energy, '#0a3a18', '#20a040');
+        this.drawBar(ctx, wx, hudY + 37, 60, 6, ws.hunger, '#3a2a08', '#c08820');
+        this.drawBar(ctx, wx, hudY + 47, 60, 6, ws.thirst, '#0a2a3a', '#2080c0');
+        ctx.font = '7px "Press Start 2P", monospace';
         ctx.fillStyle = '#888';
-        ctx.fillText('HP', wx + 73, hudY + 17);
-        ctx.fillText('EN', wx + 73, hudY + 27);
-        ctx.fillText('HU', wx + 73, hudY + 37);
-        ctx.fillText('TH', wx + 73, hudY + 47);
+        ctx.fillText('HP', wx + 63, hudY + 17);
+        ctx.fillText('EN', wx + 63, hudY + 27);
+        ctx.fillText('HU', wx + 63, hudY + 37);
+        ctx.fillText('TH', wx + 63, hudY + 47);
 
         var moodColor = ws.mood === 'Happy' ? '#50c050' : ws.mood === 'Loyal' ? '#60a060' : ws.mood === 'Hungry' ? '#c08820' : ws.mood === 'Tired' ? '#a0a040' : '#a04040';
+        ctx.font = '8px "Press Start 2P", monospace';
         ctx.fillStyle = moodColor;
-        ctx.fillText('Mood: ' + ws.mood, wx, hudY + 60);
+        ctx.fillText(ws.mood, wx, hudY + 60);
     }
 
     ctx.fillStyle = '#3a3a4a';
