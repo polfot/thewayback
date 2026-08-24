@@ -64,22 +64,23 @@ TWB.initRivers = function() {
     var h8 = TWB.hash(8000, 8000);
     var h9 = TWB.hash(9000, 9000);
 
-    var r1base = 200 + (h1 % 200);
-    var r1amp1 = 20 + (h2 % 20);
-    var r1freq1 = 0.02 + (h3 % 10) * 0.003;
-    var r1amp2 = 8 + (h4 % 12);
-    var r1freq2 = 0.06 + (h5 % 8) * 0.01;
+    var mapScale = TWB.COLS / 500;
+    var r1base = Math.round((200 + (h1 % 200)) * mapScale);
+    var r1amp1 = Math.round((20 + (h2 % 20)) * mapScale);
+    var r1freq1 = (0.02 + (h3 % 10) * 0.003) / mapScale;
+    var r1amp2 = Math.round((8 + (h4 % 12)) * mapScale);
+    var r1freq2 = (0.06 + (h5 % 8) * 0.01) / mapScale;
 
     var r2base;
-    if (r1base > 300) {
-        r2base = 60 + (h6 % 140);
+    if (r1base > 300 * mapScale) {
+        r2base = Math.round((60 + (h6 % 140)) * mapScale);
     } else {
-        r2base = 320 + (h6 % 120);
+        r2base = Math.round((320 + (h6 % 120)) * mapScale);
     }
-    var r2amp1 = 15 + (h7 % 15);
-    var r2freq1 = 0.025 + (h8 % 8) * 0.003;
-    var r2startY = 40 + (h9 % 90);
-    var r2endY = 350 + (TWB.hash(10000, 10000) % 110);
+    var r2amp1 = Math.round((15 + (h7 % 15)) * mapScale);
+    var r2freq1 = (0.025 + (h8 % 8) * 0.003) / mapScale;
+    var r2startY = Math.round((40 + (h9 % 90)) * mapScale);
+    var r2endY = Math.round((350 + (TWB.hash(10000, 10000) % 110)) * mapScale);
 
     TWB._riverParams = {
         r1base: r1base, r1amp1: r1amp1, r1freq1: r1freq1,
@@ -157,7 +158,8 @@ TWB.isOnTributary = function(tx, ty) {
 
 TWB.generateLakes = function() {
     TWB._lakeData = [];
-    var numLakes = 5 + (TWB.hash(11000, 11000) % 4);
+    var lakeScale = Math.round((TWB.COLS * TWB.ROWS) / (500 * 500));
+    var numLakes = (5 + (TWB.hash(11000, 11000) % 4)) * lakeScale;
     for (var i = 0; i < numLakes; i++) {
         var h1 = TWB.hash(i * 47 + 200, 12000);
         var h2 = TWB.hash(12000, i * 47 + 200);
@@ -432,10 +434,11 @@ TWB.generateCabins = function() {
     var startCx = 40 + ((TWB.hash(1, 6000) >>> 4) % 80);
     var startCy = 25 + ((TWB.hash(6000, 1) >>> 4) % 40);
     var rc = TWB.getRiverCenter(startCy);
-    if (Math.abs(startCx - rc) < 12) startCx = (rc > 250) ? rc - 18 : rc + 18;
+    if (Math.abs(startCx - rc) < 12) startCx = (rc > TWB.COLS / 2) ? rc - 18 : rc + 18;
     TWB._cabinData.push({ cx: startCx, cy: startCy });
 
-    for (var i = 1; i < 24; i++) {
+    var cabinCount = TWB.CABIN_COUNT || 24;
+    for (var i = 1; i < cabinCount; i++) {
         var placed = false;
         for (var att = 0; att < 100; att++) {
             var cx = margin + ((TWB.hash(i * 17 + att * 3, 7000 + i) >>> 4) % (TWB.COLS - margin * 2));
@@ -484,7 +487,8 @@ TWB._snowZones = [];
 
 TWB.generateSnowZones = function() {
     TWB._snowZones = [];
-    var count = 4 + TWB.hash(777, 888) % 4;
+    var snowScale = Math.round((TWB.COLS * TWB.ROWS) / (500 * 500));
+    var count = (4 + TWB.hash(777, 888) % 4) * snowScale;
     for (var i = 0; i < count; i++) {
         var cx = 40 + TWB.hash(i * 53, 9001) % (TWB.COLS - 80);
         var cy = 40 + TWB.hash(9001, i * 53) % (TWB.ROWS - 80);

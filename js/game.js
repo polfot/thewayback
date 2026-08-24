@@ -149,6 +149,7 @@ TWB.ACTIONS = {
     fireplace: [
         { label: 'Add wood', action: 'add_fp_wood' },
         { label: 'Cook food', action: 'cook_fp' },
+        { label: 'Rest by fire', action: 'rest' },
         { label: 'Burn herb', action: 'burn_herb_fp', needs: 'vikosherb' }
     ],
     bed: [
@@ -182,7 +183,8 @@ TWB.ACTIONS = {
     river_spot: [
         { label: 'Drink water', action: 'drink' },
         { label: 'Fill canteen', action: 'fill' },
-        { label: 'Wolf drinks', action: 'wolf_drink' }
+        { label: 'Wolf drinks', action: 'wolf_drink' },
+        { label: 'Fish', action: 'fish' }
     ],
     trap: [
         { label: 'Check trap', action: 'check_trap' },
@@ -232,6 +234,7 @@ TWB.Game = function(canvas) {
     this.camera.y = startY - canvas.height / 2;
 
     this.fireTime = 0;
+    this.footprints = [];
     this.menu = null;
     this.hoverObj = null;
     this.notification = null;
@@ -259,6 +262,7 @@ TWB.Game = function(canvas) {
     this.flashlightOn = true;
     this.logPileTakes = 0;
     this.raining = false;
+    this.recentRain = 0;
     this.rainTimer = 3600 + Math.floor(Math.random() * 7200);
     this.rainDrops = [];
     this.rainDay = -1;
@@ -1352,8 +1356,8 @@ TWB.Game.prototype.executeAction = function(obj, action) {
                 if (this.getItemCount(cookables[ci]) > 0) { ingredient = cookables[ci]; break; }
             }
             if (!ingredient) { msg = 'Need meat, rice or pasta'; break; }
-            if (!this.addToBackpack('food', 1)) { msg = 'Backpack is full!'; break; }
             this.removeFromBackpack(ingredient, 1);
+            this.addToBackpack('food', 1);
             for (var bi = 0; bi < this.backpack.length; bi++) {
                 if (this.backpack[bi] && this.backpack[bi].type === 'food' && !this.backpack[bi].cookedAt) {
                     this.backpack[bi].cookedAt = this.gameTime; break;
@@ -1536,8 +1540,8 @@ TWB.Game.prototype.executeAction = function(obj, action) {
                 if (this.getItemCount(fpCookables[fci]) > 0) { fpIngr = fpCookables[fci]; break; }
             }
             if (!fpIngr) { msg = 'Need meat, rice or pasta'; break; }
-            if (!this.addToBackpack('food', 1)) { msg = 'Backpack is full!'; break; }
             this.removeFromBackpack(fpIngr, 1);
+            this.addToBackpack('food', 1);
             for (var bi = 0; bi < this.backpack.length; bi++) {
                 if (this.backpack[bi] && this.backpack[bi].type === 'food' && !this.backpack[bi].cookedAt) {
                     this.backpack[bi].cookedAt = this.gameTime; break;
@@ -1574,6 +1578,21 @@ TWB.Game.prototype.executeAction = function(obj, action) {
             this.removeFromBackpack('canteen', 1);
             this.addToBackpack('canteen_full', 1);
             msg = 'Filled canteen with water';
+            break;
+        case 'fish':
+            if (this.getItemCount('fishing_rod') < 1) { msg = 'Need a Fishing Rod! Craft one [C]'; break; }
+            if (s.energy < 10) { msg = 'Too tired to fish...'; break; }
+            this.gameTime += 10 * 60;
+            s.energy = Math.max(0, s.energy - 8);
+            var fishChance = 0.35;
+            if (this.recentRain) fishChance = 0.6;
+            if (Math.random() < fishChance) {
+                if (!this.addToBackpack('meat', 2)) { msg = 'Caught a fish but backpack is full!'; break; }
+                this.runStats.fishCaught++;
+                msg = 'Caught a fish! +2 Meat';
+            } else {
+                msg = 'No luck... the fish aren\'t biting.';
+            }
             break;
         case 'check_trap':
             if (obj.caught) {
@@ -2111,7 +2130,17 @@ TWB.Game.prototype.update = function() {
     if (this.windowView) { this.windowView.frame++; return; }
     if (this.readingNote) return;
     this.player.update(this.objects);
-    if (this.player.moving) this.runStats.distWalked += this.player.speed / TWB.TILE;
+    if (this.player.moving) {
+        this.runStats.distWalked += this.player.speed / TWB.TILE;
+        if (!this.indoors && this.gameTime % 30 === 0) {
+            var fpTx = Math.floor(this.player.x / TWB.TILE);
+            var fpTy = Math.floor(this.player.y / TWB.TILE);
+            if (TWB.getSnowLevel(fpTx, fpTy) > 0) {
+                this.footprints.push({ x: this.player.x, y: this.player.y, age: 0 });
+                if (this.footprints.length > 200) this.footprints.shift();
+            }
+        }
+    }
 
     if (this.fleeing) {
         var cabin = null;
@@ -2300,6 +2329,7 @@ TWB.Game.prototype.update = function() {
         this.fireplaceFuel = Math.max(0, this.fireplaceFuel - fpBurn);
     }
     var nightBurnRate = this.nightActive ? 0.06 : 0.02;
+    if (this.raining && !this.indoors) nightBurnRate *= 3;
     for (var tfi = this.objects.length - 1; tfi >= 0; tfi--) {
         if (this.objects[tfi].tempFuel !== undefined) {
             this.objects[tfi].tempFuel -= nightBurnRate;
@@ -2340,6 +2370,11 @@ TWB.Game.prototype.update = function() {
     if (this.player.moving && this.gameTime % 300 === 0) {
         this.stats.energy = Math.max(0, this.stats.energy - 0.5);
         this.stats.thirst = Math.max(0, this.stats.thirst - 0.3);
+    }
+    if (!this.indoors && !this.dogStolen && this.wolfStats.mood === 'Happy' && this.gameTime % 3600 === 0 && Math.random() < 0.4) {
+        if (this.addToBackpack('sticks', 1)) {
+            this.notification = { text: (this.dogName || 'Dog') + ' brought you some sticks!', timer: 120 };
+        }
     }
     if (!this.indoors && this.raining) {
         this.wetness = Math.min(100, this.wetness + 0.05);
@@ -3029,10 +3064,12 @@ TWB.Game.prototype.update = function() {
         }
     }
 
+    if (this.recentRain > 0) this.recentRain--;
     this.rainTimer--;
     if (this.rainTimer <= 0) {
         if (this.raining) {
             this.raining = false;
+            this.recentRain = 3600;
             this.rainTimer = 5400 + Math.floor(Math.random() * 10800);
             this.notification = { text: 'The rain stopped.', timer: 120 };
             for (var ri = 0; ri < this.objects.length; ri++) {
@@ -3359,6 +3396,19 @@ TWB.Game.prototype.render = function() {
                     ctx.fillStyle = 'rgba(210,210,220,' + (sa * 0.7).toFixed(2) + ')';
                     ctx.fillRect(Math.floor(tx * TWB.TILE - cam.x), Math.floor(ty * TWB.TILE - cam.y), TWB.TILE, TWB.TILE);
                 }
+            }
+        }
+    }
+
+    if (!this.indoors) {
+        ctx.fillStyle = 'rgba(80,70,60,0.3)';
+        for (var fpi = 0; fpi < this.footprints.length; fpi++) {
+            var fp = this.footprints[fpi];
+            var fpsx = Math.floor(fp.x - cam.x);
+            var fpsy = Math.floor(fp.y - cam.y);
+            if (fpsx > -10 && fpsx < this.canvas.width + 10 && fpsy > -10 && fpsy < this.canvas.height + 10) {
+                ctx.fillRect(fpsx - 1, fpsy, 2, 3);
+                ctx.fillRect(fpsx + 3, fpsy + 1, 2, 3);
             }
         }
     }
@@ -4703,12 +4753,15 @@ TWB.Game.prototype.tryCraft = function(idx) {
         this.notification = { text: 'Missing materials!', timer: 90 };
         return;
     }
-    if (!this.addToBackpack(recipe.gives, 1)) {
-        this.notification = { text: 'Backpack is full!', timer: 90 };
-        return;
-    }
     for (var i = 0; i < recipe.needs.length; i++) {
         this.removeFromBackpack(recipe.needs[i][0], recipe.needs[i][1]);
+    }
+    if (!this.addToBackpack(recipe.gives, 1)) {
+        for (var i = 0; i < recipe.needs.length; i++) {
+            this.addToBackpack(recipe.needs[i][0], recipe.needs[i][1]);
+        }
+        this.notification = { text: 'Backpack is full!', timer: 90 };
+        return;
     }
     this.runStats.itemsCrafted++;
     this.notification = { text: 'Crafted ' + recipe.label + '!', timer: 120 };
@@ -6232,7 +6285,7 @@ TWB.Game.prototype.drawVictory = function() {
         ctx.font = '7px "Press Start 2P", monospace';
         var rs = this.runStats;
         var cabCount = Object.keys(rs.cabinsVisited).length;
-        var dist = Math.round(rs.distWalked);
+        var dist = Math.round(rs.distWalked * 10);
         var distStr = dist >= 1000 ? (dist / 1000).toFixed(1) + ' km' : dist + ' m';
         var lCol = w / 2 - 160;
         var rCol = w / 2 + 20;
@@ -6244,8 +6297,9 @@ TWB.Game.prototype.drawVictory = function() {
         ctx.fillText('Meals eaten: ' + rs.mealsEaten, lCol, sy + lh * 2);
         ctx.fillText('Items crafted: ' + rs.itemsCrafted, lCol, sy + lh * 3);
         ctx.fillText('Animals hunted: ' + rs.animalsHunted, lCol, sy + lh * 4);
-        ctx.fillText('Predator encounters: ' + rs.predators, lCol, sy + lh * 5);
-        ctx.fillText('Nights outdoors: ' + rs.nightsOut, lCol, sy + lh * 6);
+        ctx.fillText('Fish caught: ' + rs.fishCaught, lCol, sy + lh * 5);
+        ctx.fillText('Predator encounters: ' + rs.predators, lCol, sy + lh * 6);
+        ctx.fillText('Nights outdoors: ' + rs.nightsOut, lCol, sy + lh * 7);
 
         ctx.fillText('Shadow attacks: ' + rs.shadowHits, rCol, sy);
         ctx.fillText('Lowest HP: ' + Math.round(rs.lowestHP) + '%', rCol, sy + lh);
@@ -6260,7 +6314,7 @@ TWB.Game.prototype.drawVictory = function() {
     if (t >= 1) {
         ctx.fillStyle = '#6a6a7a';
         ctx.font = '8px "Press Start 2P", monospace';
-        ctx.fillText('Press R to play again', w / 2, h / 2 + 90);
+        ctx.fillText('Press R to play again', w / 2, h / 2 + 100);
     }
 
     ctx.restore();
@@ -6306,7 +6360,7 @@ TWB.Game.prototype.drawDeath = function() {
         ctx.font = '7px "Press Start 2P", monospace';
         var rs = this.runStats;
         var cabCount = Object.keys(rs.cabinsVisited).length;
-        var dist = Math.round(rs.distWalked);
+        var dist = Math.round(rs.distWalked * 10);
         var distStr = dist >= 1000 ? (dist / 1000).toFixed(1) + ' km' : dist + ' m';
         var lCol = w / 2 - 160;
         var rCol = w / 2 + 20;
@@ -6318,8 +6372,9 @@ TWB.Game.prototype.drawDeath = function() {
         ctx.fillText('Meals eaten: ' + rs.mealsEaten, lCol, sy + lh * 2);
         ctx.fillText('Items crafted: ' + rs.itemsCrafted, lCol, sy + lh * 3);
         ctx.fillText('Animals hunted: ' + rs.animalsHunted, lCol, sy + lh * 4);
-        ctx.fillText('Predator encounters: ' + rs.predators, lCol, sy + lh * 5);
-        ctx.fillText('Nights outdoors: ' + rs.nightsOut, lCol, sy + lh * 6);
+        ctx.fillText('Fish caught: ' + rs.fishCaught, lCol, sy + lh * 5);
+        ctx.fillText('Predator encounters: ' + rs.predators, lCol, sy + lh * 6);
+        ctx.fillText('Nights outdoors: ' + rs.nightsOut, lCol, sy + lh * 7);
 
         ctx.fillText('Shadow attacks: ' + rs.shadowHits, rCol, sy);
         ctx.fillText('Lowest HP: ' + Math.round(rs.lowestHP) + '%', rCol, sy + lh);
@@ -6333,7 +6388,7 @@ TWB.Game.prototype.drawDeath = function() {
     if (t >= 1) {
         ctx.fillStyle = '#6a4a4a';
         ctx.font = '8px "Press Start 2P", monospace';
-        ctx.fillText('Press R to try again', w / 2, h / 2 + 90);
+        ctx.fillText('Press R to try again', w / 2, h / 2 + 100);
     }
 
     ctx.restore();

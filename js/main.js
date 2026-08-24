@@ -60,6 +60,18 @@ document.addEventListener('DOMContentLoaded', function() {
         TWB.loadResources(function() {
             TWB.initSprites();
 
+            if (selectedDifficulty === 2) {
+                TWB.COLS = 750;
+                TWB.ROWS = 750;
+                TWB.CABIN_COUNT = 32;
+            } else {
+                TWB.COLS = 500;
+                TWB.ROWS = 500;
+                TWB.CABIN_COUNT = 24;
+            }
+            TWB.WORLD_W = TWB.COLS * TWB.TILE;
+            TWB.WORLD_H = TWB.ROWS * TWB.TILE;
+
             var canvas = document.getElementById('game-canvas');
             var game = new TWB.Game(canvas);
             game.playerName = pName;
