@@ -98,6 +98,134 @@ document.addEventListener('DOMContentLoaded', function() {
         if (e.key === 'Enter') dogInput.focus();
     });
 
+    // === Title screen walking animation ===
+    (function() {
+        var ac = document.getElementById('title-anim');
+        var actx = ac.getContext('2d');
+
+        function goldify(src) {
+            var c = document.createElement('canvas');
+            c.width = src.width; c.height = src.height;
+            var ctx = c.getContext('2d');
+            ctx.drawImage(src, 0, 0);
+            var id = ctx.getImageData(0, 0, c.width, c.height);
+            var d = id.data;
+            for (var i = 0; i < d.length; i += 4) {
+                if (d[i+3] > 0) {
+                    var br = (d[i] + d[i+1] + d[i+2]) / 3 / 255;
+                    d[i]   = Math.min(255, Math.floor(160 + br * 52));
+                    d[i+1] = Math.min(255, Math.floor(120 + br * 44));
+                    d[i+2] = Math.min(255, Math.floor(40 + br * 34));
+                }
+            }
+            ctx.putImageData(id, 0, 0);
+            return c;
+        }
+
+        var charR = [], wolfR = [], charL = [], wolfL = [];
+        for (var si = 0; si < 3; si++) {
+            var cl = goldify(makeCharSprite(2, si));
+            charL.push(cl);
+            charR.push(flipH(cl));
+            var wl = goldify(makeWolfSprite(2, si));
+            wolfL.push(wl);
+            wolfR.push(flipH(wl));
+        }
+
+        var screenW = 500;
+        ac.width = screenW;
+        ac.height = 60;
+        var pxPos = -60, wx = -110, speed = 0.5;
+        var frame = 0, tick = 0;
+        var state = 'walk', petTimer = 0, petCooldown = 300 + Math.floor(Math.random() * 200);
+        var tailFrame = 0, heartAlpha = 0;
+        var animId = null;
+        var charY = 14, wolfY = 30;
+        var groundY = 46;
+
+        function animLoop() {
+            actx.clearRect(0, 0, ac.width, ac.height);
+            // grass ground
+            actx.fillStyle = '#4a4a38';
+            actx.fillRect(0, groundY, ac.width, 14);
+            actx.fillStyle = '#464632';
+            actx.fillRect(0, groundY, ac.width, 3);
+            actx.fillStyle = '#3a3a2c';
+            for (var gi = 0; gi < ac.width; gi += 5) {
+                actx.fillRect(gi, groundY + 4 + (gi % 3), 2, 1);
+                actx.fillRect(gi + 2, groundY + 8, 1, 1);
+            }
+            actx.fillStyle = '#52523e';
+            for (var gi2 = 0; gi2 < ac.width; gi2 += 11) {
+                actx.fillRect(gi2 + 1, groundY + 2, 1, 2);
+            }
+            tick++;
+
+            if (state === 'walk') {
+                if (tick % 10 === 0) frame = (frame + 1) % 3;
+                pxPos += speed;
+                if (wx < pxPos - 40) wx += speed;
+
+                petCooldown--;
+                if (petCooldown <= 0 && pxPos > 60 && pxPos < screenW - 80) {
+                    state = 'approach';
+                    petTimer = 0;
+                }
+
+                if (pxPos > screenW + 40) { pxPos = -60; wx = -110; }
+
+                actx.drawImage(charR[frame], Math.floor(pxPos), charY);
+                actx.drawImage(wolfR[frame], Math.floor(wx), wolfY);
+            } else if (state === 'approach') {
+                if (wx < pxPos - 20) {
+                    wx += speed * 1.2;
+                    if (tick % 8 === 0) frame = (frame + 1) % 3;
+                    actx.drawImage(charL[0], Math.floor(pxPos), charY);
+                    actx.drawImage(wolfR[frame], Math.floor(wx), wolfY);
+                } else {
+                    state = 'pet';
+                    petTimer = 0;
+                    heartAlpha = 0;
+                }
+            } else if (state === 'pet') {
+                petTimer++;
+                if (tick % 6 === 0) tailFrame = (tailFrame + 1) % 3;
+                heartAlpha = Math.min(1, petTimer / 30);
+
+                actx.drawImage(charL[0], Math.floor(pxPos), charY);
+                actx.drawImage(wolfL[tailFrame], Math.floor(wx), wolfY);
+
+                if (heartAlpha > 0) {
+                    actx.globalAlpha = heartAlpha * (0.6 + 0.4 * Math.sin(tick * 0.15));
+                    actx.fillStyle = '#d44';
+                    var hx = Math.floor(wx + 14);
+                    var hy = 22 - Math.floor(petTimer * 0.04);
+                    actx.fillRect(hx - 2, hy, 2, 2);
+                    actx.fillRect(hx + 2, hy, 2, 2);
+                    actx.fillRect(hx - 3, hy + 1, 2, 2);
+                    actx.fillRect(hx + 3, hy + 1, 2, 2);
+                    actx.fillRect(hx - 2, hy + 2, 6, 2);
+                    actx.fillRect(hx - 1, hy + 4, 4, 1);
+                    actx.fillRect(hx, hy + 5, 2, 1);
+                    actx.globalAlpha = 1;
+                }
+
+                if (petTimer > 120) {
+                    state = 'walk';
+                    petCooldown = 300 + Math.floor(Math.random() * 200);
+                    frame = 0;
+                }
+            }
+
+            animId = requestAnimationFrame(animLoop);
+        }
+        animId = requestAnimationFrame(animLoop);
+
+        startBtn.addEventListener('click', function() {
+            if (animId) cancelAnimationFrame(animId);
+        });
+    })();
+
     var tutSlides = [
         {
             title: 'SURVIVAL BASICS',

@@ -49,6 +49,17 @@ body {
     gap: 8px;
 }
 
+#title-anim {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    aspect-ratio: 25 / 3;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    pointer-events: none;
+}
+
 #start-screen h1 {
     font-family: var(--font-pixel);
     font-size: 20px;
