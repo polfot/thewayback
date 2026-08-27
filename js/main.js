@@ -285,9 +285,35 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     tutBtn.addEventListener('click', function() {
-        tutPage = 0;
-        showTutSlide();
-        tutOverlay.style.display = 'flex';
+        startScreen.style.display = 'none';
+        gameWrapper.style.display = 'flex';
+
+        TWB.loadResources(function() {
+            TWB.initSprites();
+
+            TWB.COLS = 30;
+            TWB.ROWS = 28;
+            TWB.WORLD_W = TWB.COLS * TWB.TILE;
+            TWB.WORLD_H = TWB.ROWS * TWB.TILE;
+
+            var canvas = document.getElementById('game-canvas');
+            var savedGenerate = TWB.generateObjects;
+            TWB.generateObjects = TWB.generateTutorialObjects;
+            var game = new TWB.Game(canvas);
+            TWB.generateObjects = savedGenerate;
+            game.playerName = 'Player';
+            game.dogName = 'Dog';
+            game.difficulty = 0;
+            game.initTutorial();
+            window._game = game;
+
+            function loop() {
+                game.update();
+                game.render();
+                requestAnimationFrame(loop);
+            }
+            requestAnimationFrame(loop);
+        });
     });
 
     tutPrev.addEventListener('click', function() {

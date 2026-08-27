@@ -23,8 +23,25 @@ TWB.WINDOW_VIEW_LIST = [
     'w-view-river-2'
 ];
 
+TWB.CutsceneImages = {};
+TWB.CUTSCENE_LIST = [
+    'shep-man-cut-scene-day-1',
+    'shep-man-cut-scene-day-2',
+    'shep-man-cut-scene-night-1',
+    'shep-man-cut-scene-night-2',
+    'cut-scene-shadows-night-1',
+    'cut-scene-shadows-night-2',
+    'cut-scene-shadows-night-3',
+    'cut-scene-shadows-night-4',
+    'cut-scene-door-knock-1',
+    'cut-scene-door-knock-2',
+    'cut-scene-win-radio-1',
+    'cut-scene-win-hiker-1',
+    'cut-scene-win-curse-1'
+];
+
 TWB.loadResources = function(callback) {
-    var total = TWB.RESOURCE_LIST.length + TWB.WINDOW_VIEW_LIST.length;
+    var total = TWB.RESOURCE_LIST.length + TWB.WINDOW_VIEW_LIST.length + TWB.CUTSCENE_LIST.length;
     var loaded = 0;
 
     if (total === 0) { callback(); return; }
@@ -57,6 +74,13 @@ TWB.loadResources = function(callback) {
     TWB.WINDOW_VIEW_LIST.forEach(function(name) {
         var img = new Image();
         img.onload = function() { TWB.WindowViews[name] = img; done(); };
+        img.onerror = done;
+        img.src = 'resources/' + name + '.png';
+    });
+
+    TWB.CUTSCENE_LIST.forEach(function(name) {
+        var img = new Image();
+        img.onload = function() { TWB.CutsceneImages[name] = img; done(); };
         img.onerror = done;
         img.src = 'resources/' + name + '.png';
     });

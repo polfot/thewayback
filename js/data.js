@@ -10,6 +10,188 @@ TWB.WOLF_SPEED = 1.9;
 TWB.WOLF_FOLLOW_DIST = 48;
 TWB.PX = 2;
 
+TWB.NOTIFY_SHORT = 180;
+TWB.NOTIFY_TIME = 240;
+TWB.NOTIFY_LONG = 360;
+TWB.NOTIFY_XLNG = 600;
+
+TWB.FONT_XS = '7px "Press Start 2P", monospace';
+TWB.FONT_SM = '8px "Press Start 2P", monospace';
+TWB.FONT_MD = '9px "Press Start 2P", monospace';
+TWB.FONT_LG = '10px "Press Start 2P", monospace';
+TWB.FONT_XL = '24px "Press Start 2P", monospace';
+
+TWB.MSG_FULL = 'Backpack is full!';
+TWB.MSG_TIRED = 'Too tired...';
+
+TWB.PLAYER_COMMENTS = [
+    'Getting colder... need to find shelter soon.',
+    'This fog is thick. Can barely see ahead.',
+    'The wind cuts right through me.',
+    'At least the rain stopped.',
+    'Stars are out tonight. Beautiful, if I wasn\'t freezing.',
+    'The shadows move differently here.',
+    'These mountains feel like they go on forever.',
+    'The trees are so dense here. Easy to get lost.',
+    'My legs are getting heavy.',
+    'Stomach\'s growling. Need to eat something.',
+    'Can\'t remember the last time I slept properly.',
+    'Just keep moving. One step at a time.',
+    'I don\'t know how much longer I can go.',
+    'Water... I need water.',
+    'Hands are shaking. From cold or hunger, I can\'t tell.',
+    'There has to be a way out of here.',
+    'Smoke on the horizon. A cabin maybe?',
+    'If I can reach the river, I can find the way.',
+    'We\'ll make it home. We have to.',
+    'Something doesn\'t feel right about this place.',
+    'Quiet. Too quiet.'
+];
+
+TWB.DOG_COMMENTS = [
+    'stay close out here.',
+    'you sense it too, don\'t you?',
+    'we\'ll get through this.',
+    'what are you sniffing at?',
+    'I\'d be lost without you.'
+];
+
+TWB.SHEPHERD_COMMENTS = [
+    'What... what is that?',
+    'He\'s just standing there. Watching.',
+    'The old men weren\'t lying. He\'s real.',
+    'I can\'t move. I can\'t look away.',
+    'He\'s taller than any man I\'ve ever seen.',
+    'Is he... protecting us?',
+    'Those eyes. I\'ve seen them in my dreams.',
+    'He doesn\'t move like something alive.'
+];
+
+TWB.SHADOW_COMMENTS = [
+    'What is that in the dark?',
+    'Something\'s out there. I can feel it.',
+    'The shadows... they\'re moving.',
+    'That\'s not the wind. Something\'s watching us.',
+    'I\'ve never seen darkness move like that.',
+    'They\'re getting closer.',
+    'Stay close. Don\'t look at them.',
+    'The air just went cold. Ice cold.',
+    'I can hear them. Like whispers.',
+    'They don\'t have faces. Why don\'t they have faces?'
+];
+
+TWB.DOOR_KNOCK_COMMENTS = [
+    'Could be someone who needs help... or something that wants in.',
+    'Who would be out here at this hour?',
+    'The knocking won\'t stop. I have to decide.',
+    'Every instinct says don\'t open it.',
+    'What if it\'s someone like me? Lost and cold.',
+    'That knock doesn\'t sound... human.',
+    'If I ignore it, can I live with that?',
+    'Last time I trusted a stranger, it didn\'t end well.',
+    'The dog is growling. That\'s never a good sign.',
+    'Open the door and hope for the best?'
+];
+
+TWB.TUTORIAL_STEPS = [
+    { id: 'welcome', prompt: '', check: 'acknowledged', lines: [
+        'THE WAY BACK',
+        '',
+        'You are stranded in the wilderness with your dog.',
+        'Your only guide is a hand-drawn map - no GPS, no markers.',
+        'Find the target cabin to complete your quest.',
+        '',
+        'Three difficulty levels await:',
+        'Hikers - Mountaineers - The Mists',
+        'Each brings harsher weather, scarcer supplies,',
+        'and darker nights.',
+        '',
+        'Click anywhere to begin.'
+    ]},
+    { id: 'intro', prompt: 'You are lost in the wilderness. Press M to open your map.', check: 'openedMap' },
+    { id: 'mapClose', prompt: 'This is your only guide. No GPS. Find the marked cabin. Press M to close.', check: 'closedMap' },
+    { id: 'move', prompt: 'Click on the ground to move.', check: 'moved' },
+    { id: 'chop', prompt: 'Click the glowing tree to chop wood.', check: 'hasWood' },
+    { id: 'gather', prompt: 'Click a tree again and choose Gather Sticks.', check: 'hasSticks' },
+    { id: 'berries', prompt: 'Click the berry bush to pick berries.', check: 'hasBerries' },
+    { id: 'backpack', prompt: 'Press TAB to check your backpack.', check: 'openedBackpack' },
+    { id: 'closeBackpack', prompt: 'Press TAB again to close it.', check: 'closedBackpack' },
+    { id: 'craft', prompt: 'Press C to open crafting. Craft a Torch for the night.', check: 'craftedTorch' },
+    { id: 'cabin', prompt: 'Click the cabin to go inside.', check: 'enteredCabin' },
+    { id: 'search', prompt: 'Search the cabinet - find a lighter and supplies.', check: 'searched' },
+    { id: 'fireplace', prompt: 'Click the fireplace and add wood to light a fire.', check: 'litFire' },
+    { id: 'sleep', prompt: 'Click the bed to rest.', check: 'slept' },
+    { id: 'exit', prompt: 'Go outside. Night brings shadows - stay near fire or light.', check: 'exited' },
+    { id: 'done', prompt: 'Survive. Navigate. Find your way back.', check: 'complete' }
+];
+
+TWB.CLR_GOLD = '#d4a44a';
+TWB.CLR_GOLD_DARK = '#c08820';
+TWB.CLR_GOLD_LIGHT = '#ffe080';
+TWB.CLR_GOLD_DIM = '#c09030';
+TWB.CLR_GOLD_SHADOW = '#5a4020';
+
+TWB.CLR_RED = '#c04040';
+TWB.CLR_RED_BRIGHT = '#d04040';
+TWB.CLR_RED_LIGHT = '#e06060';
+TWB.CLR_RED_DARK = '#a03030';
+TWB.CLR_RED_MED = '#a04040';
+TWB.CLR_RED_DEEP = '#b83030';
+TWB.CLR_RED_BG = '#802020';
+TWB.CLR_RED_BG_DARK = '#3a2020';
+TWB.CLR_RED_BG_DEEP = '#4a1010';
+TWB.CLR_RED_BG_BLACK = '#1a1018';
+
+TWB.CLR_GREEN = '#40c060';
+TWB.CLR_GREEN_LIGHT = '#60e080';
+TWB.CLR_GREEN_MED = '#20a040';
+TWB.CLR_GREEN_PALE = '#80c080';
+TWB.CLR_GREEN_MUTED = '#60a060';
+TWB.CLR_GREEN_DARK = '#1a4a24';
+TWB.CLR_GREEN_BG = '#103a18';
+TWB.CLR_GREEN_BG_DARK = '#0a3a18';
+TWB.CLR_GREEN_FOREST = '#3a6830';
+TWB.CLR_GREEN_FOREST_DARK = '#2d5428';
+
+TWB.CLR_BLUE = '#4090c0';
+TWB.CLR_BLUE_LIGHT = '#60b0e0';
+TWB.CLR_BLUE_DARK = '#4060a0';
+TWB.CLR_BLUE_MED = '#2080c0';
+TWB.CLR_BLUE_BG = '#203848';
+TWB.CLR_BLUE_BG_DARK = '#18283a';
+TWB.CLR_BLUE_BG_DEEP = '#0a2a3a';
+
+TWB.CLR_PURPLE = '#6a4a90';
+TWB.CLR_PURPLE_DARK = '#5a3a80';
+TWB.CLR_PURPLE_BG = '#2a1a40';
+TWB.CLR_PURPLE_BG_DARK = '#0a0010';
+
+TWB.CLR_PANEL = '#1a120c';
+TWB.CLR_PANEL_DARK = '#0e0a06';
+TWB.CLR_BORDER = '#3a3a4a';
+TWB.CLR_BORDER_DARK = '#2a2a3a';
+
+TWB.CLR_TEXT = '#d4a44a';
+TWB.CLR_TEXT_DIM = '#888';
+TWB.CLR_TEXT_MUTED = '#8a9098';
+TWB.CLR_TEXT_GRAY = '#606068';
+TWB.CLR_TEXT_LIGHT = '#a0a0a8';
+TWB.CLR_TEXT_HOVER = '#8a8a9a';
+TWB.CLR_TEXT_ICON = '#6a6a7a';
+TWB.CLR_TEXT_WHITE = '#fff';
+TWB.CLR_TEXT_DARK = '#555';
+
+TWB.CLR_BG_DARK = '#0e0e0c';
+TWB.CLR_BROWN = '#8a7050';
+TWB.CLR_BROWN_DARK = '#8a7040';
+TWB.CLR_BROWN_WARM = '#a06030';
+TWB.CLR_BROWN_DEEP = '#6a5030';
+TWB.CLR_BROWN_MED = '#6a5a40';
+TWB.CLR_BROWN_PANEL = '#2e2018';
+TWB.CLR_BROWN_PANEL_DARK = '#241a12';
+TWB.CLR_BAR_GOLD_BG = '#3a2a08';
+TWB.CLR_BAR_FIRE_BG = '#1a0a04';
+
 TWB.T_GRASS1 = 0;
 TWB.T_GRASS2 = 1;
 TWB.T_GRASS3 = 2;
@@ -215,6 +397,18 @@ TWB.isOnLake = function(tx, ty) {
 TWB.getGround = function(tx, ty) {
     if (tx < 0 || ty < 0 || tx >= TWB.COLS || ty >= TWB.ROWS) return TWB.T_GRASS1;
 
+    if (TWB._isTutorial) {
+        for (var ci = 0; ci < TWB._cabinData.length; ci++) {
+            var c = TWB._cabinData[ci];
+            if (tx >= c.cx - 5 && tx <= c.cx + 5 && ty >= c.cy - 4 && ty <= c.cy + 4) return TWB.T_DIRT;
+            if (tx >= c.cx - 2 && tx <= c.cx + 2 && ty >= c.cy + 4 && ty <= c.cy + 10) return TWB.T_DIRT;
+        }
+        var h = TWB.hash(tx, ty) % 100;
+        if (h < 55) return TWB.T_GRASS1;
+        if (h < 82) return TWB.T_GRASS2;
+        return TWB.T_GRASS3;
+    }
+
     var rc = TWB.getRiverCenter(ty);
     if (tx >= rc - 1 && tx <= rc + 1) {
         if (tx === rc) return TWB.T_WATER;
@@ -276,7 +470,7 @@ TWB.isWalkable = function(wx, wy) {
 TWB.CABIN_TYPES = [
     {
         name: 'Old Shelter',
-        note: null,
+        note: 'Found black wool near the door.\nNo sheep around here.',
         loot: ['bandage', 'sticks', 'berries'],
         maxSearch: 2,
         interior: [
@@ -284,6 +478,7 @@ TWB.CABIN_TYPES = [
             { type: 'bed', gx: 6, gy: 3 },
             { type: 'cabinet', gx: 1, gy: 3 },
             { type: 'table', gx: 6, gy: 5 },
+            { type: 'note', gx: 4, gy: 2 },
             { type: 'cabin_window', gx: 2, gy: 5 }
         ]
     },
@@ -303,7 +498,7 @@ TWB.CABIN_TYPES = [
     },
     {
         name: "Shepherd's Cabin",
-        note: 'The flock grows restless at night.\nSomething watches from the ridge.',
+        note: 'The flock grows restless at night.\nSomething watches from the ridge.\nThe wolves haven\'t come since he appeared.',
         loot: ['meat', 'canned_food', 'bandage', 'canteen', 'rope', 'olive_oil'],
         maxSearch: 3,
         interior: [
@@ -346,7 +541,7 @@ TWB.CABIN_TYPES = [
     },
     {
         name: "Hermit's Cabin",
-        note: 'They won\'t understand.\nThe mountain speaks\nif you listen long enough.',
+        note: 'They won\'t understand.\nThe mountain speaks\nif you listen long enough.\nI saw him again on the ridge.\nHe was watching the valley.',
         loot: ['berries', 'berries', 'sticks', 'torch', 'bandage', 'olive_oil'],
         maxSearch: 2,
         interior: [
@@ -388,7 +583,7 @@ TWB.CABIN_TYPES = [
     },
     {
         name: "Traveler's Rest",
-        note: 'Day 4. Still no signal.\nFollowing the river south.',
+        note: 'Day 4. Still no signal.\nFollowing the river south.\nSaw something tall on the ridge at dusk.\nNot a man. Not an animal.',
         loot: ['canned_food', 'canteen', 'bandage', 'pasta', 'rice', 'olive_oil'],
         maxSearch: 3,
         interior: [
@@ -578,7 +773,7 @@ TWB.generateRescueNote = function(fromIdx, toIdx, itemName, stepIndex) {
     var templates = [
         'Found tracks heading ' + dir + '.\nThe hiker left gear behind.\nThere\'s a cabin ' + landmark + '.\nMaybe more clues there.',
         'A torn page from a journal.\nMentions a shelter ' + dir + ',\n' + landmark + '.\nThey were heading that way.',
-        'Bootprints in the mud lead\n' + dir + '. A cabin ' + landmark + '\nmight hold the last clue.\nHurry — the weather\'s turning.'
+        'Bootprints in the mud lead\n' + dir + '. A cabin ' + landmark + '\nmight hold the last clue.\nHurry - the weather\'s turning.'
     ];
     return templates[stepIndex % templates.length];
 };
@@ -718,9 +913,46 @@ TWB.initScenario = function() {
     }
 };
 
+TWB.generateTutorialObjects = function() {
+    TWB._cabinData = [];
+    TWB._cabinData.push({ cx: 15, cy: 10, type: 0, damaged: false, repaired: false });
+    TWB._cabinData.push({ cx: 24, cy: 20, type: 1, damaged: false, repaired: false });
+    TWB._startCabin = 0;
+    TWB._targetCabin = 1;
+    TWB._scenario = 'RESCUE';
+    TWB._scenarioData = { objectiveText: 'Complete the tutorial.', cluesFound: [false, false, false] };
+    TWB._riverParams = { r1base: -100, r1amp1: 0, r1amp2: 0, r1freq1: 0, r1freq2: 0, r2startY: -100, r2endY: -100 };
+    TWB._tributaries = [];
+    TWB._lakeData = [];
+    TWB._snowZones = [];
+    TWB._isTutorial = true;
+
+    var objs = [];
+    objs.push({ type: 'cabin', x: 15 * TWB.TILE, y: 10 * TWB.TILE, solid: true, colW: 80, colH: 28, colOx: -40, colOy: -20 });
+    objs.push({ type: 'cabin', x: 24 * TWB.TILE, y: 20 * TWB.TILE, solid: true, colW: 80, colH: 28, colOx: -40, colOy: -20 });
+    objs.push({ type: 'tree_pine', x: 20 * TWB.TILE, y: 16 * TWB.TILE, solid: true, colR: 6 });
+    objs.push({ type: 'tree_oak', x: 22 * TWB.TILE, y: 17 * TWB.TILE, solid: true, colR: 6 });
+    objs.push({ type: 'bush_berry', x: 18 * TWB.TILE, y: 18 * TWB.TILE, solid: false, berries: 3 });
+    objs.push({ type: 'rock', x: 12 * TWB.TILE, y: 17 * TWB.TILE, solid: true, colR: 10 });
+
+    for (var ty = 0; ty < TWB.ROWS; ty++) {
+        for (var tx = 0; tx < TWB.COLS; tx++) {
+            if (tx >= 9 && tx <= 25 && ty >= 6 && ty <= 22) continue;
+            var border = ty <= 2 || ty >= TWB.ROWS - 3 || tx >= TWB.COLS - 3 || tx <= 2;
+            var edge = ty <= 5 || ty >= TWB.ROWS - 5 || tx >= TWB.COLS - 5 || tx <= 5;
+            if (border || (edge && TWB.hash(tx, ty) % 3 === 0)) {
+                objs.push({ type: 'tree_pine', x: tx * TWB.TILE, y: ty * TWB.TILE, solid: true, colR: 6 });
+            }
+        }
+    }
+
+    return objs;
+};
+
 // === OBJECT GENERATION ===
 
 TWB.generateObjects = function() {
+    TWB._isTutorial = false;
     TWB.initWorld();
 
     var objs = [];
@@ -897,6 +1129,21 @@ TWB.generateObjects = function() {
         if (bg !== TWB.T_WATER && bg !== TWB.T_SHORE) {
             objs.push({ type: 'bush_berry', x: bx * TWB.TILE, y: by * TWB.TILE, solid: false, berries: 3 });
         }
+    }
+
+    var fountainCount = 2 + (TWB.hash(4200, 4200) % 2);
+    for (var fti = 0; fti < fountainCount; fti++) {
+        var ftx = 20 + Math.floor(TWB.hash(fti * 41, 4300) % (TWB.COLS - 40));
+        var fty = 20 + Math.floor(TWB.hash(4300, fti * 41) % (TWB.ROWS - 40));
+        var ftg = TWB.getGround(ftx, fty);
+        if (ftg === TWB.T_WATER || ftg === TWB.T_WATER_DEEP || ftg === TWB.T_SHORE) continue;
+        var nearCabFt = false;
+        for (var fci = 0; fci < TWB._cabinData.length; fci++) {
+            var fc = TWB._cabinData[fci];
+            if (Math.abs(ftx - fc.cx) < 10 && Math.abs(fty - fc.cy) < 10) { nearCabFt = true; break; }
+        }
+        if (nearCabFt) continue;
+        objs.push({ type: 'fountain', x: ftx * TWB.TILE, y: fty * TWB.TILE, solid: true, colR: 12 });
     }
 
     for (var bui = 0; bui < 20; bui++) {

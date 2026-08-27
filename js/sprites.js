@@ -248,6 +248,299 @@ function makeCharSprite(dir, frame) {
     });
 }
 
+// === SHEEP ===
+
+function drawSheepBody(ctx, dir) {
+    var wool = '#c8c0b0';
+    var wdk = '#a89880';
+    var wlt = '#d8d0c0';
+    var face = '#2a2018';
+    var flt = '#3a3028';
+    if (dir === 0) {
+        // fluffy wool body - wider and rounder than wolf
+        px(ctx, 2, 2, 10, 6, wool);
+        px(ctx, 1, 3, 12, 4, wool);
+        px(ctx, 3, 2, 8, 2, wlt);
+        px(ctx, 2, 4, 2, 2, wdk);
+        px(ctx, 10, 4, 2, 2, wdk);
+        // woolly bumps on top
+        px(ctx, 3, 1, 3, 1, wool);
+        px(ctx, 8, 1, 3, 1, wool);
+        // dark face below
+        px(ctx, 4, 8, 6, 3, face);
+        px(ctx, 5, 8, 4, 2, flt);
+        // ears
+        px(ctx, 3, 7, 2, 2, face);
+        px(ctx, 9, 7, 2, 2, face);
+    } else if (dir === 1) {
+        px(ctx, 2, 2, 10, 6, wool);
+        px(ctx, 1, 3, 12, 4, wool);
+        px(ctx, 3, 2, 8, 2, wlt);
+        px(ctx, 2, 4, 2, 2, wdk);
+        px(ctx, 10, 4, 2, 2, wdk);
+        px(ctx, 3, 1, 3, 1, wool);
+        px(ctx, 8, 1, 3, 1, wool);
+        // tail bump
+        px(ctx, 6, 8, 2, 2, wool);
+    } else if (dir === 2) {
+        // side view - elongated fluffy body
+        px(ctx, 1, 2, 11, 5, wool);
+        px(ctx, 0, 3, 13, 3, wool);
+        px(ctx, 2, 2, 8, 2, wlt);
+        px(ctx, 1, 4, 2, 2, wdk);
+        px(ctx, 10, 4, 2, 2, wdk);
+        // woolly bumps
+        px(ctx, 3, 1, 3, 1, wool);
+        px(ctx, 7, 1, 3, 1, wool);
+        // head - dark face sticking out left
+        px(ctx, 0, 1, 3, 3, face);
+        px(ctx, 1, 1, 2, 2, flt);
+        // ear
+        px(ctx, 0, 0, 2, 1, face);
+        // tail
+        px(ctx, 12, 3, 1, 2, wool);
+    }
+}
+
+function drawSheepLegs(ctx, dir, frame) {
+    var dk = '#2a2018';
+    if (dir === 0 || dir === 1) {
+        if (frame === 0) {
+            px(ctx, 4, 7, 2, 3, dk);
+            px(ctx, 8, 7, 2, 3, dk);
+        } else if (frame === 1) {
+            px(ctx, 3, 7, 2, 3, dk);
+            px(ctx, 9, 7, 2, 2, dk);
+        } else {
+            px(ctx, 5, 7, 2, 2, dk);
+            px(ctx, 8, 7, 2, 3, dk);
+        }
+    } else if (dir === 2) {
+        if (frame === 0) {
+            px(ctx, 3, 7, 2, 3, dk);
+            px(ctx, 8, 7, 2, 3, dk);
+        } else if (frame === 1) {
+            px(ctx, 2, 7, 2, 3, dk);
+            px(ctx, 9, 7, 2, 2, dk);
+        } else {
+            px(ctx, 4, 7, 2, 2, dk);
+            px(ctx, 7, 7, 2, 3, dk);
+        }
+    }
+}
+
+function makeSheepSprite(dir, frame) {
+    return makeCanvas(28, 24, function(ctx) {
+        shadow(ctx, 4, 20, 20, 4);
+        drawSheepBody(ctx, dir);
+        drawSheepLegs(ctx, dir, frame);
+    });
+}
+
+// === SHEPHERD MAN ===
+
+function drawShepherdBody(ctx, dir) {
+    var bk = '#080604';
+    var dk = '#0c0a08';
+    var md = '#141010';
+    var lt = '#1a1410';
+    var wool = '#1e1610';
+    var wdk = '#100c08';
+    var horn = '#282018';
+    var eye = '#3a2e24';
+    var rag = '#0a0806';
+    if (dir === 0) {
+        // horns
+        px(ctx, 7, 0, 1, 3, horn);
+        px(ctx, 6, 1, 1, 1, horn);
+        px(ctx, 14, 0, 1, 3, horn);
+        px(ctx, 15, 1, 1, 1, horn);
+        // head
+        px(ctx, 8, 1, 6, 5, dk);
+        px(ctx, 7, 2, 8, 4, bk);
+        px(ctx, 9, 3, 4, 2, md);
+        // eyes
+        px(ctx, 9, 4, 1, 1, eye);
+        px(ctx, 12, 4, 1, 1, eye);
+        // hood
+        px(ctx, 7, 5, 8, 3, dk);
+        px(ctx, 8, 6, 6, 2, bk);
+        // shoulders
+        px(ctx, 5, 8, 12, 3, wool);
+        px(ctx, 4, 9, 14, 2, wdk);
+        // cloak upper
+        px(ctx, 5, 11, 12, 5, dk);
+        px(ctx, 4, 12, 14, 4, bk);
+        px(ctx, 6, 12, 10, 3, md);
+        // cloak middle
+        px(ctx, 4, 16, 14, 5, dk);
+        px(ctx, 3, 17, 16, 4, bk);
+        px(ctx, 5, 17, 12, 3, md);
+        // folds
+        px(ctx, 6, 13, 1, 8, bk);
+        px(ctx, 15, 13, 1, 8, bk);
+        px(ctx, 9, 14, 1, 5, dk);
+        px(ctx, 12, 14, 1, 5, dk);
+        px(ctx, 10, 15, 2, 4, bk);
+        // cloak lower
+        px(ctx, 3, 21, 16, 4, dk);
+        px(ctx, 2, 22, 18, 3, bk);
+        px(ctx, 4, 22, 14, 2, md);
+        // ragged edges
+        px(ctx, 2, 25, 1, 2, rag);
+        px(ctx, 4, 25, 2, 1, dk);
+        px(ctx, 7, 25, 1, 2, rag);
+        px(ctx, 9, 25, 2, 1, bk);
+        px(ctx, 12, 25, 1, 2, dk);
+        px(ctx, 14, 25, 2, 1, rag);
+        px(ctx, 17, 25, 1, 2, bk);
+        px(ctx, 19, 25, 1, 2, rag);
+        px(ctx, 3, 26, 1, 1, bk);
+        px(ctx, 6, 26, 1, 1, rag);
+        px(ctx, 10, 26, 1, 1, dk);
+        px(ctx, 15, 26, 1, 1, rag);
+        px(ctx, 18, 26, 1, 1, bk);
+    } else if (dir === 1) {
+        // horns
+        px(ctx, 7, 0, 1, 3, horn);
+        px(ctx, 6, 1, 1, 1, horn);
+        px(ctx, 14, 0, 1, 3, horn);
+        px(ctx, 15, 1, 1, 1, horn);
+        // back of head
+        px(ctx, 8, 1, 6, 5, dk);
+        px(ctx, 7, 2, 8, 4, bk);
+        px(ctx, 9, 3, 4, 2, wool);
+        // hood
+        px(ctx, 7, 5, 8, 3, dk);
+        px(ctx, 8, 6, 6, 2, bk);
+        // shoulders
+        px(ctx, 5, 8, 12, 3, wool);
+        px(ctx, 4, 9, 14, 2, wdk);
+        // cloak back
+        px(ctx, 5, 11, 12, 5, dk);
+        px(ctx, 4, 12, 14, 4, bk);
+        px(ctx, 6, 12, 10, 3, wool);
+        // cloak middle
+        px(ctx, 4, 16, 14, 5, dk);
+        px(ctx, 3, 17, 16, 4, bk);
+        px(ctx, 5, 17, 12, 3, md);
+        // folds
+        px(ctx, 7, 13, 1, 7, wdk);
+        px(ctx, 14, 13, 1, 7, wdk);
+        px(ctx, 10, 14, 2, 6, wdk);
+        // lower cloak
+        px(ctx, 3, 21, 16, 4, dk);
+        px(ctx, 2, 22, 18, 3, bk);
+        px(ctx, 4, 22, 14, 2, md);
+        // ragged bottom
+        px(ctx, 2, 25, 1, 2, rag);
+        px(ctx, 5, 25, 2, 1, dk);
+        px(ctx, 8, 25, 1, 2, rag);
+        px(ctx, 10, 25, 2, 1, bk);
+        px(ctx, 13, 25, 1, 2, dk);
+        px(ctx, 15, 25, 1, 2, rag);
+        px(ctx, 17, 25, 2, 1, dk);
+        px(ctx, 19, 25, 1, 2, rag);
+        px(ctx, 3, 26, 1, 1, bk);
+        px(ctx, 6, 26, 1, 1, rag);
+        px(ctx, 11, 26, 1, 1, dk);
+        px(ctx, 16, 26, 1, 1, rag);
+        px(ctx, 18, 26, 1, 1, bk);
+    } else if (dir === 2) {
+        // horn
+        px(ctx, 3, 0, 1, 3, horn);
+        px(ctx, 2, 1, 1, 1, horn);
+        // head profile
+        px(ctx, 4, 1, 7, 5, dk);
+        px(ctx, 3, 2, 8, 4, bk);
+        px(ctx, 5, 3, 4, 2, md);
+        // eye
+        px(ctx, 5, 4, 1, 1, eye);
+        // hood
+        px(ctx, 3, 5, 9, 3, dk);
+        px(ctx, 4, 6, 7, 2, bk);
+        // shoulder
+        px(ctx, 2, 8, 12, 3, wool);
+        px(ctx, 1, 9, 14, 2, wdk);
+        // cloak side
+        px(ctx, 2, 11, 12, 5, dk);
+        px(ctx, 1, 12, 14, 4, bk);
+        px(ctx, 3, 12, 10, 3, md);
+        // cloak middle
+        px(ctx, 1, 16, 14, 5, dk);
+        px(ctx, 1, 17, 15, 4, bk);
+        px(ctx, 2, 17, 12, 3, md);
+        // folds
+        px(ctx, 5, 13, 1, 7, bk);
+        px(ctx, 9, 14, 1, 5, dk);
+        px(ctx, 13, 13, 1, 6, bk);
+        // lower cloak
+        px(ctx, 1, 21, 16, 4, dk);
+        px(ctx, 0, 22, 17, 3, bk);
+        px(ctx, 2, 22, 13, 2, md);
+        // ragged bottom
+        px(ctx, 0, 25, 1, 2, rag);
+        px(ctx, 3, 25, 1, 2, dk);
+        px(ctx, 6, 25, 2, 1, rag);
+        px(ctx, 9, 25, 1, 2, bk);
+        px(ctx, 12, 25, 1, 2, rag);
+        px(ctx, 14, 25, 2, 1, dk);
+        px(ctx, 16, 25, 1, 2, rag);
+        px(ctx, 1, 26, 1, 1, bk);
+        px(ctx, 4, 26, 1, 1, rag);
+        px(ctx, 10, 26, 1, 1, dk);
+        px(ctx, 13, 26, 1, 1, rag);
+    }
+}
+
+function drawShepherdLegs(ctx, dir, frame) {
+    var dk = '#0c0a08';
+    var md = '#141010';
+    if (dir === 0 || dir === 1) {
+        if (frame === 0) {
+            px(ctx, 8, 25, 3, 5, dk);
+            px(ctx, 11, 25, 3, 5, dk);
+            px(ctx, 8, 30, 3, 1, md);
+            px(ctx, 11, 30, 3, 1, md);
+        } else if (frame === 1) {
+            px(ctx, 7, 25, 3, 5, dk);
+            px(ctx, 7, 30, 3, 1, md);
+            px(ctx, 12, 25, 3, 4, dk);
+            px(ctx, 12, 29, 3, 1, md);
+        } else {
+            px(ctx, 9, 25, 3, 4, dk);
+            px(ctx, 9, 29, 3, 1, md);
+            px(ctx, 11, 25, 3, 5, dk);
+            px(ctx, 11, 30, 3, 1, md);
+        }
+    } else if (dir === 2) {
+        if (frame === 0) {
+            px(ctx, 6, 25, 3, 5, dk);
+            px(ctx, 11, 25, 3, 5, dk);
+            px(ctx, 6, 30, 3, 1, md);
+            px(ctx, 11, 30, 3, 1, md);
+        } else if (frame === 1) {
+            px(ctx, 5, 25, 3, 5, dk);
+            px(ctx, 5, 30, 3, 1, md);
+            px(ctx, 12, 25, 3, 4, dk);
+            px(ctx, 12, 29, 3, 1, md);
+        } else {
+            px(ctx, 7, 25, 3, 4, dk);
+            px(ctx, 7, 29, 3, 1, md);
+            px(ctx, 11, 25, 3, 5, dk);
+            px(ctx, 11, 30, 3, 1, md);
+        }
+    }
+}
+
+function makeShepherdSprite(dir, frame) {
+    return makeCanvas(44, 64, function(ctx) {
+        shadow(ctx, 6, 62, 30, 2);
+        drawShepherdBody(ctx, dir);
+        drawShepherdLegs(ctx, dir, frame);
+    });
+}
+
 // === WOLF ===
 
 function drawWolfBody(ctx, dir) {
@@ -798,6 +1091,51 @@ function drawCurseShrineSprite(ctx) {
     px(ctx, 10, 16, 1, 10, dk);
 }
 
+function drawFountainSprite(ctx) {
+    // P=2 scale, so canvas 48x36 = 24x18 in px coords
+    // wide pyramid: center at x=12
+    shadow(ctx, 1, 15, 22, 3);
+    var dk = '#1a1816'; var md = '#282420'; var lt = '#343028';
+    var hi = '#403830'; var hi2 = '#4a4238';
+    // base row - 22 wide
+    px(ctx, 1, 14, 22, 2, dk);
+    px(ctx, 2, 13, 20, 2, md);
+    px(ctx, 3, 14, 4, 1, lt); px(ctx, 17, 14, 4, 1, lt);
+    // row 2 - 18 wide
+    px(ctx, 3, 11, 18, 2, dk);
+    px(ctx, 4, 10, 16, 2, md);
+    px(ctx, 5, 11, 3, 1, lt); px(ctx, 16, 11, 3, 1, lt);
+    px(ctx, 10, 12, 4, 1, hi);
+    // row 3 - 14 wide
+    px(ctx, 5, 8, 14, 2, dk);
+    px(ctx, 6, 7, 12, 2, md);
+    px(ctx, 7, 8, 3, 1, lt); px(ctx, 14, 8, 3, 1, lt);
+    px(ctx, 10, 9, 4, 1, hi);
+    // row 4 - 10 wide
+    px(ctx, 7, 5, 10, 2, dk);
+    px(ctx, 8, 4, 8, 2, md);
+    px(ctx, 9, 5, 2, 1, lt); px(ctx, 13, 5, 2, 1, lt);
+    // peak - 6 wide
+    px(ctx, 9, 2, 6, 2, dk);
+    px(ctx, 10, 1, 4, 2, md);
+    px(ctx, 11, 1, 2, 1, lt);
+    // texture highlights
+    px(ctx, 2, 13, 1, 1, hi); px(ctx, 21, 14, 1, 1, hi);
+    px(ctx, 4, 10, 1, 1, hi2); px(ctx, 19, 11, 1, 1, hi2);
+    px(ctx, 6, 7, 1, 1, hi2); px(ctx, 17, 8, 1, 1, hi);
+    // spout at top center
+    px(ctx, 11, 0, 2, 1, '#505860');
+    // water from center top flowing down front
+    px(ctx, 11, 1, 2, 1, '#4a7090');
+    px(ctx, 12, 3, 1, 2, '#3a6080');
+    px(ctx, 12, 6, 1, 2, '#4a7090');
+    px(ctx, 12, 9, 1, 2, '#3a6080');
+    px(ctx, 12, 12, 1, 2, '#4a7090');
+    // pool at base center
+    px(ctx, 10, 16, 4, 1, '#3a6888');
+    px(ctx, 9, 17, 6, 1, '#2a5060');
+}
+
 function drawCairnSprite(ctx) {
     shadow(ctx, 3, 26, 18, 4);
     var dk = '#1a1816'; var md = '#242220'; var lt = '#302c28';
@@ -834,16 +1172,20 @@ function drawWindowSprite(ctx) {
 }
 
 function drawShadowSprite(ctx) {
-    px(ctx, 3, 0, 4, 3, '#0a0a14');
-    px(ctx, 2, 3, 6, 2, '#08080f');
-    px(ctx, 3, 5, 4, 4, '#0a0a14');
-    px(ctx, 2, 7, 6, 5, '#06060c');
-    px(ctx, 1, 10, 8, 4, '#08080f');
-    px(ctx, 2, 14, 2, 5, '#06060c');
-    px(ctx, 6, 14, 2, 5, '#06060c');
-    px(ctx, 3, 14, 4, 3, '#04040a');
-    px(ctx, 3, 1, 1, 1, '#1a1a30');
-    px(ctx, 5, 1, 1, 1, '#1a1a30');
+    px(ctx, 3, 0, 4, 2, '#06060e');
+    px(ctx, 2, 1, 6, 3, '#08080f');
+    px(ctx, 3, 1, 4, 2, '#04040a');
+    px(ctx, 3, 4, 4, 2, '#0a0a14');
+    px(ctx, 2, 6, 6, 3, '#06060c');
+    px(ctx, 1, 9, 8, 4, '#08080f');
+    px(ctx, 1, 13, 8, 3, '#06060c');
+    px(ctx, 0, 16, 10, 2, '#04040a');
+    px(ctx, 0, 18, 2, 1, '#03030a');
+    px(ctx, 4, 18, 2, 1, '#03030a');
+    px(ctx, 8, 18, 2, 1, '#03030a');
+    px(ctx, 1, 19, 1, 1, '#02020808');
+    px(ctx, 5, 19, 1, 1, '#02020808');
+    px(ctx, 9, 19, 1, 1, '#02020808');
 }
 
 function drawFatesSprite(ctx) {
@@ -890,6 +1232,14 @@ TWB.initSprites = function() {
     TWB.Sprites.wolfUp = [];
     TWB.Sprites.wolfLeft = [];
     TWB.Sprites.wolfRight = [];
+    TWB.Sprites.sheepDown = [];
+    TWB.Sprites.sheepUp = [];
+    TWB.Sprites.sheepLeft = [];
+    TWB.Sprites.sheepRight = [];
+    TWB.Sprites.shepherdDown = [];
+    TWB.Sprites.shepherdUp = [];
+    TWB.Sprites.shepherdLeft = [];
+    TWB.Sprites.shepherdRight = [];
 
     for (i = 0; i < 3; i++) {
         TWB.Sprites.charDown.push(makeCharSprite(0, i));
@@ -898,10 +1248,18 @@ TWB.initSprites = function() {
         TWB.Sprites.wolfDown.push(makeWolfSprite(0, i));
         TWB.Sprites.wolfUp.push(makeWolfSprite(1, i));
         TWB.Sprites.wolfLeft.push(makeWolfSprite(2, i));
+        TWB.Sprites.sheepDown.push(makeSheepSprite(0, i));
+        TWB.Sprites.sheepUp.push(makeSheepSprite(1, i));
+        TWB.Sprites.sheepLeft.push(makeSheepSprite(2, i));
+        TWB.Sprites.shepherdDown.push(makeShepherdSprite(0, i));
+        TWB.Sprites.shepherdUp.push(makeShepherdSprite(1, i));
+        TWB.Sprites.shepherdLeft.push(makeShepherdSprite(2, i));
     }
     for (i = 0; i < 3; i++) {
         TWB.Sprites.charRight.push(flipH(TWB.Sprites.charLeft[i]));
         TWB.Sprites.wolfRight.push(flipH(TWB.Sprites.wolfLeft[i]));
+        TWB.Sprites.sheepRight.push(flipH(TWB.Sprites.sheepLeft[i]));
+        TWB.Sprites.shepherdRight.push(flipH(TWB.Sprites.shepherdLeft[i]));
     }
 
     TWB.Sprites.tree_pine = makeCanvas(48, 80, drawPine);
@@ -932,6 +1290,7 @@ TWB.initSprites = function() {
     TWB.Sprites.crate = makeCanvas(24, 22, drawCrateSprite);
     TWB.Sprites.note = makeCanvas(14, 10, drawNoteSprite);
     TWB.Sprites.cabin_window = makeCanvas(28, 22, drawWindowSprite);
+    TWB.Sprites.fountain = makeCanvas(48, 36, drawFountainSprite);
     TWB.Sprites.cairn = makeCanvas(24, 30, drawCairnSprite);
     TWB.Sprites.shrine = makeCanvas(32, 44, drawShrineSprite);
     TWB.Sprites.curse_shrine = makeCanvas(32, 44, drawCurseShrineSprite);
@@ -940,6 +1299,30 @@ TWB.initSprites = function() {
     TWB.Sprites.stepping_stones = makeCanvas(32, 32, drawSteppingStonesSprite);
     TWB.Sprites.fates = makeCanvas(84, 36, drawFatesSprite);
     TWB.Sprites.shadow = makeCanvas(20, 38, drawShadowSprite);
+
+    // shepherd man ground objects
+    TWB.Sprites.shepherd_tracks = makeCanvas(20, 12, function(ctx) {
+        // dark hoofprints
+        px(ctx, 1, 1, 2, 3, '#1a1412');
+        px(ctx, 4, 1, 2, 3, '#1a1412');
+        px(ctx, 6, 3, 2, 3, '#181210');
+        px(ctx, 9, 3, 2, 3, '#181210');
+    });
+    TWB.Sprites.shepherd_wool = makeCanvas(16, 12, function(ctx) {
+        // dark wool tuft
+        px(ctx, 2, 2, 4, 3, '#2a2018');
+        px(ctx, 1, 3, 6, 2, '#1a1412');
+        px(ctx, 3, 1, 2, 1, '#302820');
+        px(ctx, 2, 4, 1, 1, '#0e0a08');
+    });
+    TWB.Sprites.shepherd_bell = makeCanvas(16, 14, function(ctx) {
+        // small old bell
+        px(ctx, 3, 1, 2, 1, '#4a4030');
+        px(ctx, 2, 2, 4, 3, '#6a5a40');
+        px(ctx, 1, 5, 6, 2, '#5a4a35');
+        px(ctx, 3, 7, 2, 1, '#3a3020');
+        px(ctx, 3, 3, 2, 1, '#7a6a50');
+    });
 
     for (var name in TWB.Resources) {
         if (TWB.Resources.hasOwnProperty(name)) {
@@ -974,12 +1357,16 @@ TWB.getSpriteAnchor = function(type) {
         case 'crate': return { x: 12, y: 18 };
         case 'note': return { x: 7, y: 8 };
         case 'cabin_window': return { x: 14, y: 18 };
+        case 'fountain': return { x: 24, y: 32 };
         case 'cairn': return { x: 12, y: 26 };
         case 'shrine': return { x: 16, y: 38 };
         case 'curse_shrine': return { x: 16, y: 38 };
         case 'bridge': return { x: 16, y: 16 };
         case 'broken_bridge': return { x: 16, y: 16 };
         case 'stepping_stones': return { x: 16, y: 16 };
+        case 'shepherd_tracks': return { x: 10, y: 8 };
+        case 'shepherd_wool': return { x: 8, y: 8 };
+        case 'shepherd_bell': return { x: 8, y: 10 };
         default: return { x: 0, y: 0 };
     }
 };

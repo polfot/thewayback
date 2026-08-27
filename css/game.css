@@ -7,6 +7,9 @@
     --text: #c8c8d0;
     --text-dim: #6a6a7a;
     --accent: #d4a44a;
+    --accent-light: #e0b45a;
+    --error: #aa4444;
+    --selected-bg: #1a1a28;
     --font-pixel: 'Press Start 2P', 'Courier New', monospace;
     --font-mono: 'Courier New', monospace;
 }
@@ -95,7 +98,7 @@ body {
 #start-screen .error-msg {
     font-family: var(--font-pixel);
     font-size: 8px;
-    color: #aa4444;
+    color: var(--error);
     height: 14px;
 }
 
@@ -125,7 +128,7 @@ body {
 .diff-btn.selected {
     border-color: var(--accent);
     color: var(--accent);
-    background: #1a1a28;
+    background: var(--selected-bg);
 }
 
 #diff-desc {
@@ -150,7 +153,7 @@ body {
 }
 
 #start-btn:hover {
-    background: #e0b45a;
+    background: var(--accent-light);
 }
 
 #start-btn:disabled {
