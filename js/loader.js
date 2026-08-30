@@ -12,15 +12,50 @@ TWB.RESOURCE_LIST = [
     { name: 'spr_cabinet', src: 'resources/canteen/canteen-savespace-1.png', tw: 28, ax: 0.5, ay: 0.5 }
 ];
 
+TWB.HudIcons = {};
+TWB.HUD_ICON_LIST = [
+    { name: 'backpack', src: 'resources/icons/icon-backpack.png' },
+    { name: 'map', src: 'resources/icons/icon-map.png' },
+    { name: 'craft', src: 'resources/icons/icon-craft.png' },
+    { name: 'light', src: 'resources/icons/icon-light.png' },
+    { name: 'settings', src: 'resources/icons/settings.png' }
+];
+
 TWB._imageAnchors = {};
 
 TWB.WindowViews = {};
 TWB.WINDOW_VIEW_LIST = [
     'w-view-mountain-day-1',
     'w-view-mountain-day-2',
+    'w-view-mountain-day-3',
+    'w-view-mountain-day-4',
     'w-view-mountain-night-1',
+    'w-view-mountain-night-3',
+    'w-view-mountain-night-4',
     'w-view-river-1',
     'w-view-river-2'
+];
+
+TWB.AudioBuffers = {};
+TWB.AUDIO_LIST = [
+    { name: 'rain_loop', src: 'resources/sound-efx/rain_loop.wav' },
+    { name: 'wind_loop', src: 'resources/sound-efx/wind_loop.wav' },
+    { name: 'chop_stick', src: 'resources/sound-efx/chop-stick.wav' },
+    { name: 'door_knock', src: 'resources/sound-efx/door-knock.wav' },
+    { name: 'door_opening', src: 'resources/sound-efx/door-opening.wav' },
+    { name: 'footstep', src: 'resources/sound-efx/footstep.wav' },
+    { name: 'backpack_open', src: 'resources/sound-efx/backpack-open.wav' },
+    { name: 'backpack_close', src: 'resources/sound-efx/backpack-close.wav' },
+    { name: 'clicker', src: 'resources/sound-efx/clicker.wav' },
+    { name: 'craft', src: 'resources/sound-efx/craft.wav' },
+    { name: 'dog_bark', src: 'resources/sound-efx/dog-bark.wav' },
+    { name: 'drink', src: 'resources/sound-efx/drink.wav' },
+    { name: 'eat', src: 'resources/sound-efx/eat.wav' },
+    { name: 'fire', src: 'resources/sound-efx/fire.wav' },
+    { name: 'flashlight', src: 'resources/sound-efx/flashlight.wav' },
+    { name: 'item_pickup', src: 'resources/sound-efx/item-pickup.wav' },
+    { name: 'map_open_close', src: 'resources/sound-efx/map-open-close.wav' },
+    { name: 'notification', src: 'resources/sound-efx/notification.wav' }
 ];
 
 TWB.CutsceneImages = {};
@@ -37,11 +72,24 @@ TWB.CUTSCENE_LIST = [
     'cut-scene-door-knock-2',
     'cut-scene-win-radio-1',
     'cut-scene-win-hiker-1',
-    'cut-scene-win-curse-1'
+    'cut-scene-win-curse-1',
+    'cute-scene-fate-1',
+    'cut-scene-night-1',
+    'cut-scene-night-2'
+];
+
+TWB.MapSprites = {};
+TWB.MAP_SPRITE_LIST = [
+    'pine_tree', 'deciduous_tree', 'dead_tree', 'cabin', 'relay_station', 'windmill',
+    'boulder_cluster', 'bush', 'berry_bush', 'herb_flower', 'mushroom', 'cairn',
+    'lake', 'well', 'bridge', 'broken_bridge', 'stepping_stones', 'shrine_cross', 'campfire',
+    'player_marker', 'dog_marker', 'compass_rose', 'x_marker', 'question_marker',
+    'checkmark', 'backpack', 'grass_tuft_1', 'grass_tuft_2', 'grass_tuft_3',
+    'mountain_silhouette', 'trail_segment'
 ];
 
 TWB.loadResources = function(callback) {
-    var total = TWB.RESOURCE_LIST.length + TWB.WINDOW_VIEW_LIST.length + TWB.CUTSCENE_LIST.length;
+    var total = TWB.RESOURCE_LIST.length + TWB.WINDOW_VIEW_LIST.length + TWB.CUTSCENE_LIST.length + TWB.HUD_ICON_LIST.length + TWB.AUDIO_LIST.length + TWB.MAP_SPRITE_LIST.length;
     var loaded = 0;
 
     if (total === 0) { callback(); return; }
@@ -83,6 +131,34 @@ TWB.loadResources = function(callback) {
         img.onload = function() { TWB.CutsceneImages[name] = img; done(); };
         img.onerror = done;
         img.src = 'resources/' + name + '.png';
+    });
+
+    TWB.HUD_ICON_LIST.forEach(function(icon) {
+        var img = new Image();
+        img.onload = function() { TWB.HudIcons[icon.name] = img; done(); };
+        img.onerror = done;
+        img.src = icon.src;
+    });
+
+    TWB.MAP_SPRITE_LIST.forEach(function(name) {
+        var img = new Image();
+        img.onload = function() { TWB.MapSprites[name] = img; done(); };
+        img.onerror = done;
+        img.src = 'resources/map-assets/' + name + '.png';
+    });
+
+    TWB.AUDIO_LIST.forEach(function(snd) {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', snd.src, true);
+        xhr.responseType = 'arraybuffer';
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                TWB.AudioBuffers[snd.name] = xhr.response;
+            }
+            done();
+        };
+        xhr.onerror = done;
+        xhr.send();
     });
 };
 

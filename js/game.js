@@ -239,9 +239,7 @@ TWB.ACTIONS = {
     shepherd_bell: [
         { label: 'Pick up bell', action: 'pickup_shepherd_bell' }
     ],
-    shepherd_tracks: [
-        { label: 'Examine tracks', action: 'examine_tracks' }
-    ]
+    shepherd_tracks: []
 };
 
 // === GAME ===
@@ -396,6 +394,11 @@ TWB.Game = function(canvas) {
     this.phantom2Cooldown = 0;
 
     this.iconHover = -1;
+    this.settingsOpen = false;
+    this.settingsGearHover = false;
+    this.settingsSliderDrag = false;
+    this.audioVolume = 0.6;
+    this.audioMuted = false;
 
     var cursedCandidates = [];
     for (var cci = 0; cci < TWB._cabinData.length; cci++) {
@@ -462,6 +465,7 @@ TWB.Game = function(canvas) {
     this.shepherdCutsceneDone = false;
     this.winCutscene = null;
     this.shadowCutsceneDone = false;
+    this.nightCutsceneDone = false;
     this.doorKnockCutscene = null;
     this.missionBrief = true;
 
@@ -521,7 +525,105 @@ TWB.Game = function(canvas) {
         { q: 'I am not alive, but I grow.\nI have no lungs, but I need air.\nWhat am I?', a: ['Fire', 'A shadow'], correct: 0 },
         { q: 'What is always coming\nbut never arrives?', a: ['Tomorrow', 'Death'], correct: 0 },
         { q: 'What can travel the world\nwhile staying in a corner?', a: ['A stamp', 'A thought'], correct: 0 },
-        { q: 'What breaks but never falls,\nand falls but never breaks?', a: ['Day and night', 'Hope and rain'], correct: 0 }
+        { q: 'What breaks but never falls,\nand falls but never breaks?', a: ['Day and night', 'Hope and rain'], correct: 0 },
+        { q: 'I devour all things: birds, beasts, trees, flowers;\nI gnaw iron, bite steel;\ngrind hard stones to meal.\nWhat am I?', a: ['Time', 'Fire'], correct: 0 },
+        { q: 'I have no voice, yet I tell of the past.\nI have no life, yet I am made to last.\nWhat am I?', a: ['A stone', 'A song'], correct: 0 },
+        { q: 'I run forever, but never grow tired.\nI have a bed, but never sleep.\nWhat am I?', a: ['A river', 'The wind'], correct: 0 },
+        { q: 'The thread of life is measured by my hand,\nyet I have no fingers, no legs to stand.\nWhat am I?', a: ['A spindle', 'A clock'], correct: 0 },
+        { q: 'Touch me and I am gone,\nname me and I break.\nWhat am I?', a: ['Silence', 'A dream'], correct: 0 },
+        { q: 'I follow you through the bright of day,\nbut in the dark I fade away.\nWhat am I?', a: ['A shadow', 'A memory'], correct: 0 },
+        { q: 'I am light as a feather,\nyet no man can hold me\nfor much longer than a minute.\nWhat am I?', a: ['Breath', 'A secret'], correct: 0 },
+        { q: 'I have no eyes, but once I wept.\nI have no mouth, but secrets kept.\nWhat am I?', a: ['A cloud', 'A skull'], correct: 0 },
+        { q: 'I am born in a cavern, I die in the sky,\nI give life to the earth as I pass by.\nWhat am I?', a: ['Rain', 'Smoke'], correct: 0 },
+        { q: 'I can build castles, yet slip through your hand.\nI mark every hour upon the dry land.\nWhat am I?', a: ['Sand', 'Gold'], correct: 0 },
+        { q: 'I wear a cloak of silver bright,\nI rule the tide and rule the night.\nWhat am I?', a: ['The moon', 'The ocean'], correct: 0 },
+        { q: 'I give you wings without leaving the ground,\nI show you worlds without a sound.\nWhat am I?', a: ['A dream', 'A mirror'], correct: 0 },
+        { q: 'I am always hungry, I must be fed,\nthe finger I touch will soon turn red.\nWhat am I?', a: ['Fire', 'Rust'], correct: 0 },
+        { q: 'I cut through darkness, silent and cold,\nI strike the young, I gather the old.\nWhat am I?', a: ['Death', 'Winter'], correct: 0 },
+        { q: 'I bind two souls together as one,\nyet I can be broken before day is done.\nWhat am I?', a: ['A promise', 'A rope'], correct: 0 },
+        { q: 'I dance in the winter, I weep in the sun,\nI vanish completely when springtime has come.\nWhat am I?', a: ['Snow', 'Frost'], correct: 0 },
+        { q: 'I fly without wings, I cry without eyes.\nWhenever I rise, darkness dies.\nWhat am I?', a: ['Dawn', 'An eagle'], correct: 0 },
+        { q: 'I am born from the earth, born from the oak,\nI carry no burden, I wear a dark cloak.\nWhat am I?', a: ['An acorn', 'A root'], correct: 0 },
+        { q: 'I am a coat that has no seams,\nI wrap the land in quiet dreams.\nWhat am I?', a: ['Fog', 'Night'], correct: 0 },
+        { q: 'I move without legs, I strike without hands,\nI swallow the ships and carve out the lands.\nWhat am I?', a: ['The sea', 'A storm'], correct: 0 },
+        { q: 'I have a head, but I cannot think.\nI have a tongue, but I cannot drink.\nWhat am I?', a: ['A shoe', 'A bell'], correct: 0 },
+        { q: 'I am weightless, but I can sink a ship.\nI am invisible, but felt on the lip.\nWhat am I?', a: ['Wind', 'A whisper'], correct: 0 },
+        { q: 'I am precious to all, yet given away,\nI am lost in a night, or gained in a day.\nWhat am I?', a: ['Trust', 'Gold'], correct: 0 },
+        { q: 'I cast no shade, I leave no trace,\nyet I am reflected in every face.\nWhat am I?', a: ['Age', 'Light'], correct: 0 },
+        { q: 'I have a spine, but no bones inside,\nI hold ancient tales that the dead tried to hide.\nWhat am I?', a: ['A scroll', 'A tomb'], correct: 0 },
+        { q: 'I am woven by fate, cut by the shears,\nI am measured in moments, in days, and in years.\nWhat am I?', a: ['Life', 'A tapestry'], correct: 0 },
+        { q: 'I fall from the sky without a sound,\nI turn the green leaves into brown on the ground.\nWhat am I?', a: ['Autumn', 'Frost'], correct: 0 },
+        { q: 'I live in the mountains, cold and white,\nI catch the first ray of the morning light.\nWhat am I?', a: ['A peak', 'A glacier'], correct: 0 },
+        { q: 'I grow smaller the longer I stand,\nI shed golden tears upon the cold land.\nWhat am I?', a: ['A candle', 'An hourglass'], correct: 0 },
+        { q: 'I am an island in a sea of night,\nI warm the weary with my golden light.\nWhat am I?', a: ['A campfire', 'A star'], correct: 0 },
+        { q: 'I have no flesh, no feather, no bone,\nyet I have four wings of my own.\nWhat am I?', a: ['A windmill', 'A butterfly'], correct: 0 },
+        { q: 'I am a road without a stone,\nI carry the dead to the unknown.\nWhat am I?', a: ['A river', 'A path'], correct: 0 },
+        { q: 'I am born in a flash, die in a roar,\nI shatter the sky from shore to shore.\nWhat am I?', a: ['Lightning', 'Thunder'], correct: 0 },
+        { q: 'I have no teeth, but I can bite.\nI have no form, but bring great fright.\nWhat am I?', a: ['Cold', 'Darkness'], correct: 0 },
+        { q: 'I am buried alive, but I do not die,\nI reach for the sun up in the sky.\nWhat am I?', a: ['A seed', 'A root'], correct: 0 },
+        { q: 'I carry water, yet I am dry.\nI soar above, across the sky.\nWhat am I?', a: ['A cloud', 'A bird'], correct: 0 },
+        { q: 'I am a box with no hinges, key, or lid,\nyet golden treasure inside is hid.\nWhat am I?', a: ['An egg', 'A nut'], correct: 0 },
+        { q: 'I can be cracked, I can be made,\nI can be told, I can be played.\nWhat am I?', a: ['A joke', 'A riddle'], correct: 0 },
+        { q: 'I creep through the mountain, quiet and slow,\nI turn every green tree into ice and snow.\nWhat am I?', a: ['Winter', 'The wind'], correct: 0 },
+        { q: 'I have one eye, but cannot see.\nI thread through life for you and me.\nWhat am I?', a: ['A needle', 'A storm'], correct: 0 },
+        { q: 'I am a veil over the meadow spread,\nI disappear when the sun turns red.\nWhat am I?', a: ['Dew', 'Mist'], correct: 0 },
+        { q: 'I am born of passion, fed by pain,\nI heal the heart or break the brain.\nWhat am I?', a: ['Love', 'Sorrow'], correct: 0 },
+        { q: 'I walk before kings, I kneel before none,\nI fade away when the day is done.\nWhat am I?', a: ['A shadow', 'Time'], correct: 0 },
+        { q: 'I hold water, but I am full of holes.\nI clean the body, but not our souls.\nWhat am I?', a: ['A sponge', 'A net'], correct: 0 },
+        { q: 'I fly without feathers, I sting without a bee,\nI pass through the forest and bend every tree.\nWhat am I?', a: ['The wind', 'An arrow'], correct: 0 },
+        { q: 'I am a thief that comes by night,\nI steal your strength and dim your sight.\nWhat am I?', a: ['Old age', 'Sleep'], correct: 0 },
+        { q: 'I am built by hands, but destroyed by breath,\nI house the living or mark a death.\nWhat am I?', a: ['A house of cards', 'A tomb'], correct: 0 },
+        { q: 'I have no voice, but I can scream,\nI am real, yet feel like a dream.\nWhat am I?', a: ['Pain', 'An echo'], correct: 0 },
+        { q: 'I am a circle that has no end,\nI bind a lord unto his friend.\nWhat am I?', a: ['A ring', 'A crown'], correct: 0 },
+        { q: 'I am smaller than an insect\'s eye,\nyet I contain the starry sky.\nWhat am I?', a: ['A dewdrop', 'A teardrop'], correct: 0 },
+        { q: 'I am a bridge across the stream,\nmade of light and color\'s gleam.\nWhat am I?', a: ['A rainbow', 'A reflection'], correct: 0 },
+        { q: 'I am a crown without a king,\nI blossom in the early spring.\nWhat am I?', a: ['A wreath', 'A flower'], correct: 0 },
+        { q: 'I drink the blood of the fallen leaf,\nI bring the farmer joy or grief.\nWhat am I?', a: ['Soil', 'Rain'], correct: 0 },
+        { q: 'I have a heart that does not beat,\nI stand forever on cold feet.\nWhat am I?', a: ['A mountain', 'A statue'], correct: 0 },
+        { q: 'I am a phantom born of heat,\nI trick the eye upon the street.\nWhat am I?', a: ['A mirage', 'A shadow'], correct: 0 },
+        { q: 'I am a song without a word,\nby every forest animal heard.\nWhat am I?', a: ['The wind', 'A stream'], correct: 0 },
+        { q: 'I am a shield against the cold,\nmore soft than silk, more rich than gold.\nWhat am I?', a: ['Fur', 'Wool'], correct: 0 },
+        { q: 'I am a cage with ribs of bone,\nI keep a beating heart alone.\nWhat am I?', a: ['The chest', 'A prison'], correct: 0 },
+        { q: 'I am a ghost that haunts your mind,\nof days that you have left behind.\nWhat am I?', a: ['Regret', 'A memory'], correct: 0 },
+        { q: 'I am a seed that grows in dark,\nignited by a single spark.\nWhat am I?', a: ['An idea', 'A fire'], correct: 0 },
+        { q: 'I am a traveler with no home,\nacross the heavens I do roam.\nWhat am I?', a: ['A comet', 'A cloud'], correct: 0 },
+        { q: 'I am a warrior without a sword,\nI conquer lands without a word.\nWhat am I?', a: ['Pestilence', 'Time'], correct: 0 },
+        { q: 'I am a mirror of the sky,\nI hold the birds as they fly by.\nWhat am I?', a: ['A lake', 'An eye'], correct: 0 },
+        { q: 'I am a weapon forged in stone,\nI strike down giants all alone.\nWhat am I?', a: ['A slingshot', 'An axe'], correct: 0 },
+        { q: 'I am a whisper in the reed,\nI sow the wilderness\'s seed.\nWhat am I?', a: ['The breeze', 'A bird'], correct: 0 },
+        { q: 'I am a cloak of silver gray,\nI hide the mountain path away.\nWhat am I?', a: ['Fog', 'Night'], correct: 0 },
+        { q: 'I am a fire that burns no wood,\nI work for bad, I work for good.\nWhat am I?', a: ['Anger', 'Envy'], correct: 0 },
+        { q: 'I am a tree without a leaf,\nI bring a mother boundless grief.\nWhat am I?', a: ['A gallows', 'A cross'], correct: 0 },
+        { q: 'I am a path through rocky stone,\nwhere traveler must walk alone.\nWhat am I?', a: ['A pass', 'Fate'], correct: 0 },
+        { q: 'I am a flower made of ice,\nI bloom but once, I bloom but twice.\nWhat am I?', a: ['Frost', 'A snowflake'], correct: 0 },
+        { q: 'I am a keeper of the dead,\na stone pillow for the head.\nWhat am I?', a: ['A tombstone', 'A grave'], correct: 0 },
+        { q: 'I am a vessel filled with sea,\nyet not a single drop in me.\nWhat am I?', a: ['A seashell', 'A sponge'], correct: 0 },
+        { q: 'I am a harness for the wind,\nby sailors on the deep blue pinned.\nWhat am I?', a: ['A sail', 'A kite'], correct: 0 },
+        { q: 'I am a serpent made of water,\nearth\'s eternal, winding daughter.\nWhat am I?', a: ['A stream', 'A wave'], correct: 0 },
+        { q: 'I am a giant made of stone,\nstanding in the wild alone.\nWhat am I?', a: ['A cliff', 'A monolith'], correct: 0 },
+        { q: 'I am a blanket cold and deep,\nunder which the flowers sleep.\nWhat am I?', a: ['Snow', 'Earth'], correct: 0 },
+        { q: 'I am a hunter with no bow,\nI catch my prey in web below.\nWhat am I?', a: ['A spider', 'A trap'], correct: 0 },
+        { q: 'I am a beacon in the night,\nguiding travelers with my light.\nWhat am I?', a: ['The North Star', 'A lighthouse'], correct: 0 },
+        { q: 'I am a fruit with golden skin,\nwith bitter seeds trapped deep within.\nWhat am I?', a: ['A pomegranate', 'An apple'], correct: 0 },
+        { q: 'I am a cup that holds the rain,\nI give relief to thirst and pain.\nWhat am I?', a: ['A leaf', 'A flower'], correct: 0 },
+        { q: 'I am a shadow on the sun,\nmy brief existence soon is done.\nWhat am I?', a: ['An eclipse', 'A cloud'], correct: 0 },
+        { q: 'I am a song of iron bright,\nclashing in the thick of fight.\nWhat am I?', a: ['A sword', 'A shield'], correct: 0 },
+        { q: 'I am a beast with horns of wood,\nI run as fast as any could.\nWhat am I?', a: ['A stag', 'A goat'], correct: 0 },
+        { q: 'I am a garden made of bone,\nwhere quiet souls reside alone.\nWhat am I?', a: ['A graveyard', 'A crypt'], correct: 0 },
+        { q: 'I am a breath of winter air,\nI freeze the water everywhere.\nWhat am I?', a: ['Frost', 'The gale'], correct: 0 },
+        { q: 'I am a mother to the trees,\nI feed the flowers and the bees.\nWhat am I?', a: ['The earth', 'Spring'], correct: 0 },
+        { q: 'I am a spirit in the wine,\nI make men think themselves divine.\nWhat am I?', a: ['Drunkenness', 'Pride'], correct: 0 },
+        { q: 'I am a bird that cannot fly,\nI watch the ancient days go by.\nWhat am I?', a: ['A carving', 'A stone'], correct: 0 },
+        { q: 'I am a lock without a key,\nI hold the soul in mystery.\nWhat am I?', a: ['The body', 'A secret'], correct: 0 },
+        { q: 'I am a fire in the blood,\nI wash away good like a flood.\nWhat am I?', a: ['Rage', 'Lust'], correct: 0 },
+        { q: 'I am a veil across the eye,\nI make the bravest warriors cry.\nWhat am I?', a: ['Grief', 'Blindness'], correct: 0 },
+        { q: 'I am a weight upon the heart,\nthat tears two lover\'s souls apart.\nWhat am I?', a: ['Sorrow', 'Distance'], correct: 0 },
+        { q: 'I am a child of oak and rain,\nI soothe the weary body\'s pain.\nWhat am I?', a: ['A hearth fire', 'A shelter'], correct: 0 },
+        { q: 'I am a jewel upon the grass,\nthat melts whenever footsteps pass.\nWhat am I?', a: ['Dew', 'Ice'], correct: 0 },
+        { q: 'I am a voice inside your head,\nthat speaks when all others have fled.\nWhat am I?', a: ['Conscience', 'Fear'], correct: 0 },
+        { q: 'I am a silver thread of light,\nthat cuts across the sky at night.\nWhat am I?', a: ['A shooting star', 'A comet'], correct: 0 },
+        { q: 'I am a house without a door,\nwhere ancient spirits sleep and snore.\nWhat am I?', a: ['A cave', 'A grave'], correct: 0 },
+        { q: 'I am the end of every song,\nthe place where all mortals belong.\nWhat am I?', a: ['Dust', 'Silence'], correct: 0 }
     ];
 
     this.setupInput();
@@ -535,29 +637,31 @@ TWB.Game.prototype.setupInput = function() {
         var sx = (e.clientX - rect.left) * (self.canvas.width / rect.width);
         var sy = (e.clientY - rect.top) * (self.canvas.height / rect.height);
 
-        if (self.fates && self.fates.fade >= 1) {
-            var fw = 340, fh = 220;
-            var fx = (self.canvas.width - fw) / 2;
-            var fy = (self.canvas.height - fh) / 2;
-            var btnW = 140, btnH = 30;
-            var btnY = fy + fh - 52;
-            var btn1x = fx + fw / 2 - btnW - 10;
-            var btn2x = fx + fw / 2 + 10;
-            self.fates.hovered = -1;
-            if (sy >= btnY && sy <= btnY + btnH) {
-                if (sx >= btn1x && sx <= btn1x + btnW) self.fates.hovered = 0;
-                if (sx >= btn2x && sx <= btn2x + btnW) self.fates.hovered = 1;
+        if (self.fates) {
+            var fElapsed = (Date.now() - self.fates.startTime) / 1000;
+            if (fElapsed >= 3.5) {
+                var fCw = self.canvas.width;
+                var fCh = self.canvas.height;
+                var fBtnW = 140, fBtnH = 28, fBtnGap = 20;
+                var fBtnY = fCh * 0.78 + 34;
+                var fBtn1x = fCw / 2 - fBtnW - fBtnGap / 2;
+                var fBtn2x = fCw / 2 + fBtnGap / 2;
+                self.fates.hovered = -1;
+                if (sy >= fBtnY && sy <= fBtnY + fBtnH) {
+                    if (sx >= fBtn1x && sx <= fBtn1x + fBtnW) self.fates.hovered = 0;
+                    if (sx >= fBtn2x && sx <= fBtn2x + fBtnW) self.fates.hovered = 1;
+                }
+                self.canvas.style.cursor = self.fates.hovered >= 0 ? TWB.CURSOR_POINTER : TWB.CURSOR_DEFAULT;
             }
-            self.canvas.style.cursor = self.fates.hovered >= 0 ? 'pointer' : 'default';
             return;
         }
 
         if (self.backpackOpen) {
             var si = self.getBackpackSlotAt(sx, sy);
             if (si >= 0 || self.getBackpackBtnAt(sx, sy)) {
-                self.canvas.style.cursor = 'pointer';
+                self.canvas.style.cursor = TWB.CURSOR_POINTER;
             } else {
-                self.canvas.style.cursor = 'default';
+                self.canvas.style.cursor = TWB.CURSOR_DEFAULT;
             }
             if (self.backpackHover >= 0) {
                 self.backpackBtnHover = self.getBackpackBtnAt(sx, sy);
@@ -585,7 +689,7 @@ TWB.Game.prototype.setupInput = function() {
                 } else {
                     dkc.hovered = null;
                 }
-                self.canvas.style.cursor = dkc.hovered ? 'pointer' : 'default';
+                self.canvas.style.cursor = dkc.hovered ? TWB.CURSOR_POINTER : TWB.CURSOR_DEFAULT;
             }
             return;
         }
@@ -597,24 +701,32 @@ TWB.Game.prototype.setupInput = function() {
 
         var iconHit = self.getIconAt(sx, sy);
         if (iconHit) {
-            self.iconHover = iconHit === 'TAB' ? 0 : iconHit === 'M' ? 1 : iconHit === 'C' ? 2 : 3;
-            self.canvas.style.cursor = 'pointer';
+            self.iconHover = iconHit === 'TAB' ? 0 : iconHit === 'M' ? 1 : iconHit === 'C' ? 2 : iconHit === 'L' ? 3 : 4;
+            self.canvas.style.cursor = TWB.CURSOR_POINTER;
             self.hoverObj = null;
             return;
         }
         self.iconHover = -1;
+        if (self.settingsOpen && self.settingsSliderDrag) {
+            var l = self.getSettingsLayout();
+            var sliderX = l.px + 10;
+            var sliderW = l.pw - 20;
+            self.audioVolume = Math.max(0, Math.min(1, (sx - sliderX) / sliderW));
+            if (TWB.Audio.master) TWB.Audio.master.gain.value = self.audioMuted ? 0 : self.audioVolume;
+            return;
+        }
 
         var w = self.camera.screenToWorld(sx, sy);
         var obj = self.findObjectAt(w.x, w.y);
         if (obj && TWB.ACTIONS[obj.type] && self.isInRange(obj)) {
             self.hoverObj = obj;
-            self.canvas.style.cursor = 'pointer';
+            self.canvas.style.cursor = TWB.CURSOR_POINTER;
         } else if (!TWB.indoors && self.isNearWater(w.x, w.y) && self.isInRange({ x: w.x, y: w.y })) {
             self.hoverObj = null;
-            self.canvas.style.cursor = 'pointer';
+            self.canvas.style.cursor = TWB.CURSOR_POINTER;
         } else {
             self.hoverObj = null;
-            self.canvas.style.cursor = 'crosshair';
+            self.canvas.style.cursor = TWB.CURSOR_DEFAULT;
         }
     });
 
@@ -670,20 +782,27 @@ TWB.Game.prototype.setupInput = function() {
         var sx = (e.clientX - rect.left) * (self.canvas.width / rect.width);
         var sy = (e.clientY - rect.top) * (self.canvas.height / rect.height);
 
+        if (self.handleSettingsClick(sx, sy)) return;
+
         var iconHit = self.getIconAt(sx, sy);
         if (iconHit) {
             if (iconHit === 'TAB') {
                 self.backpackOpen = !self.backpackOpen;
+                TWB.Audio.playSFX(self.backpackOpen ? 'backpack_open' : 'backpack_close', false, 0.5);
                 self.backpackHover = -1;
                 self.backpackBtnHover = null;
                 if (self.backpackOpen) { self.menu = null; self.craftingOpen = false; self.mapOpen = false; }
             } else if (iconHit === 'M') {
-                if (!self.backpackOpen && !self.craftingOpen && !self.menu) self.mapOpen = !self.mapOpen;
+                if (!self.backpackOpen && !self.craftingOpen && !self.menu) { self.mapOpen = !self.mapOpen; TWB.Audio.playSFX('map_open_close', false, 0.5); }
             } else if (iconHit === 'C') {
-                if (!self.backpackOpen && !self.menu) { self.craftingOpen = !self.craftingOpen; self.craftHover = -1; if (self.craftingOpen) self.mapOpen = false; }
+                if (!self.backpackOpen && !self.menu) { self.craftingOpen = !self.craftingOpen; TWB.Audio.playSFX('clicker', false, 0.4); self.craftHover = -1; if (self.craftingOpen) self.mapOpen = false; }
             } else if (iconHit === 'L') {
                 self.flashlightOn = !self.flashlightOn;
+                TWB.Audio.playSFX('flashlight', false, 0.5);
                 self.notify('Flashlight ' + (self.flashlightOn ? 'ON' : 'OFF'), TWB.NOTIFY_SHORT);
+            } else if (iconHit === 'S') {
+                self.settingsOpen = !self.settingsOpen;
+                TWB.Audio.playSFX('clicker', false, 0.4);
             }
             return;
         }
@@ -699,30 +818,18 @@ TWB.Game.prototype.setupInput = function() {
             return;
         }
 
-        if (self.fates && self.fates.fade >= 1) {
-            var fw = 340, fh = 220;
-            var fx = (self.canvas.width - fw) / 2;
-            var fy = (self.canvas.height - fh) / 2;
-            var btnW = 140, btnH = 30;
-            var btnY = fy + fh - 52;
-            var btn1x = fx + fw / 2 - btnW - 10;
-            var btn2x = fx + fw / 2 + 10;
-            if (sy >= btnY && sy <= btnY + btnH) {
-                if (sx >= btn1x && sx <= btn1x + btnW) {
-                    self.handleFatesAnswer(0);
-                    return;
-                }
-                if (sx >= btn2x && sx <= btn2x + btnW) {
-                    self.handleFatesAnswer(1);
-                    return;
-                }
+        if (self.fates) {
+            var fElapsed = (Date.now() - self.fates.startTime) / 1000;
+            if (fElapsed >= 3.5 && self.fates.hovered >= 0) {
+                self.handleFatesAnswer(self.fates.hovered);
             }
             return;
         }
 
         var closeHit = self.getPanelCloseAt(sx, sy);
-        if (closeHit === 'backpack') { self.backpackOpen = false; self.backpackHover = -1; return; }
+        if (closeHit === 'backpack') { self.backpackOpen = false; self.backpackHover = -1; TWB.Audio.playSFX('backpack_close', false, 0.5); return; }
         if (closeHit === 'crafting') { self.craftingOpen = false; return; }
+        if (closeHit === 'settings') { self.settingsOpen = false; return; }
 
         if (self.craftingOpen) {
             var ci = self.getCraftItemAt(sx, sy);
@@ -751,6 +858,7 @@ TWB.Game.prototype.setupInput = function() {
                             self.stats.health = Math.min(100, self.stats.health + hpGain);
                             self.stats.hunger = Math.min(100, self.stats.hunger + hunGain);
                             self.runStats.mealsEaten++;
+                            TWB.Audio.playSFX('eat', false, 0.5);
                             msg = 'Ate ' + label + ' (+' + hunGain + ' hunger)';
                             break;
                         case 'feed':
@@ -769,6 +877,7 @@ TWB.Game.prototype.setupInput = function() {
                             self.removeFromBackpack('canteen_full', 1);
                             self.addToBackpack('canteen', 1);
                             self.stats.thirst = Math.min(100, self.stats.thirst + 35);
+                            TWB.Audio.playSFX('drink', false, 0.5);
                             msg = 'Drank from canteen (+35 thirst)';
                             break;
                         case 'dog_drink_canteen':
@@ -868,7 +977,14 @@ TWB.Game.prototype.setupInput = function() {
         }
     });
 
-    this.canvas.style.cursor = 'crosshair';
+    this.canvas.style.cursor = TWB.CURSOR_DEFAULT;
+
+    this.canvas.addEventListener('mouseup', function() {
+        self.settingsSliderDrag = false;
+    });
+    document.addEventListener('mouseup', function() {
+        self.settingsSliderDrag = false;
+    });
 
     this.canvas.addEventListener('contextmenu', function(e) {
         e.preventDefault();
@@ -941,6 +1057,30 @@ TWB.Game.prototype.setupInput = function() {
             self.wolf.tx = self.wolf.x; self.wolf.ty = self.wolf.y;
             if (self.indoors) { self.indoors = false; TWB.indoors = false; if (self.outdoorState) { self.objects = self.outdoorState.objects; } }
             self.notify('CHEAT: Curse ready. Click the cabin.');
+        },
+        'rain': function() {
+            if (self.raining) {
+                self.raining = false;
+                self.rainTimer = 5400 + Math.floor(Math.random() * 10800);
+                TWB.Audio.stopRain();
+                self.notify('CHEAT: Rain stopped.');
+            } else {
+                self.raining = true;
+                self.rainTimer = 99999;
+                TWB.Audio.startRain();
+                self.notify('CHEAT: Rain started.');
+            }
+        },
+        'wind': function() {
+            if (self.windSpeed > 0) {
+                self.windSpeed = 0;
+                TWB.Audio.stopAmbient('wind_loop');
+                self.notify('CHEAT: Wind stopped.');
+            } else {
+                self.windSpeed = 2.5;
+                TWB.Audio.startWind(self.windSpeed);
+                self.notify('CHEAT: Wind started.');
+            }
         }
     };
 
@@ -967,6 +1107,7 @@ TWB.Game.prototype.setupInput = function() {
         if (self.shepherdCutscene && (Date.now() - self.shepherdCutscene.startTime) > 3500) { self.shepherdCutscene = null; return; }
         if (self.shepherdCutscene) return;
         if (self.doorKnockCutscene) return;
+        if (self.fates) return;
         if (self.tutorialMode && e.key === 'Escape') {
             self.tutorialMode = false;
             location.reload();
@@ -1003,6 +1144,7 @@ TWB.Game.prototype.setupInput = function() {
         if (e.key === 'Tab') {
             e.preventDefault();
             self.backpackOpen = !self.backpackOpen;
+            TWB.Audio.playSFX(self.backpackOpen ? 'backpack_open' : 'backpack_close', false, 0.5);
             self.backpackHover = -1;
             self.backpackBtnHover = null;
             if (self.backpackOpen) self.menu = null;
@@ -1011,15 +1153,18 @@ TWB.Game.prototype.setupInput = function() {
         if (e.key === 'c' || e.key === 'C') {
             if (self.backpackOpen || self.menu) return;
             self.craftingOpen = !self.craftingOpen;
+            TWB.Audio.playSFX('clicker', false, 0.4);
             self.craftHover = -1;
         }
         if (e.key === 'l' || e.key === 'L') {
             self.flashlightOn = !self.flashlightOn;
+            TWB.Audio.playSFX('flashlight', false, 0.5);
             self.notify('Flashlight ' + (self.flashlightOn ? 'ON' : 'OFF'), TWB.NOTIFY_SHORT);
         }
         if (e.key === 'm' || e.key === 'M') {
             if (self.backpackOpen || self.craftingOpen || self.menu) return;
             self.mapOpen = !self.mapOpen;
+            TWB.Audio.playSFX('map_open_close', false, 0.5);
         }
         if (e.key.length === 1) {
             self.cheatBuffer = (self.cheatBuffer + e.key.toLowerCase()).slice(-10);
@@ -1033,6 +1178,7 @@ TWB.Game.prototype.setupInput = function() {
             }
             if (cb.slice(-5) === 'night') {
                 self.gameTime = 20 * 3600 + 30 * 60;
+                self.nightActive = false;
                 self.notify('CHEAT: Night falls');
                 self.cheatBuffer = '';
             }
@@ -1137,6 +1283,7 @@ TWB.Game.prototype.setupInput = function() {
                     self.doorShake = 90;
                     var dkImgs2 = ['cut-scene-door-knock-1', 'cut-scene-door-knock-2'];
                     var dkKey2 = dkImgs2[Math.floor(Math.random() * dkImgs2.length)];
+                    TWB.Audio.playSFX('door_knock', false, 0.6);
                     if (TWB.CutsceneImages[dkKey2]) {
                         var dkTxt = (self.playerName || 'Player') + ': ' + TWB.DOOR_KNOCK_COMMENTS[Math.floor(Math.random() * TWB.DOOR_KNOCK_COMMENTS.length)];
                         self.doorKnockCutscene = { img: TWB.CutsceneImages[dkKey2], timer: 0, startTime: Date.now(), comment: dkTxt, hovered: null };
@@ -1144,6 +1291,41 @@ TWB.Game.prototype.setupInput = function() {
                     self.notify('CHEAT: Knock at the door');
                 } else {
                     self.notify('Must be inside a cabin');
+                }
+                self.cheatBuffer = '';
+            }
+            if (cb.slice(-4) === 'wolf') {
+                if (!self.predator && !self.dogSense) {
+                    var wAngle = Math.random() * Math.PI * 2;
+                    var wPred = Math.random() < 0.5
+                        ? { name: 'Wild Wolf', hp: 40, timer: 600 }
+                        : { name: 'Bear', hp: 60, timer: 900 };
+                    self.dogSense = { phase: 0, timer: 0, angle: wAngle, pred: wPred };
+                    TWB.Audio.playSFX('dog_bark', false, 0.5);
+                    self.notify('CHEAT: ' + wPred.name + ' approaching!');
+                } else {
+                    self.notify('Predator already active');
+                }
+                self.cheatBuffer = '';
+            }
+            if (cb.slice(-5) === 'fates') {
+                var fqi = Math.floor(Math.random() * self.fatesQuestions.length);
+                var fateImg = TWB.CutsceneImages['cute-scene-fate-1'];
+                if (fateImg) {
+                    var cfq = self.fatesQuestions[fqi];
+                    var cSwap = Math.random() < 0.5;
+                    var cDispA = cSwap ? [cfq.a[1], cfq.a[0]] : [cfq.a[0], cfq.a[1]];
+                    var cDispC = cSwap ? 1 : 0;
+                    self.fates = {
+                        question: { q: cfq.q, a: cDispA, correct: cDispC },
+                        img: fateImg,
+                        startTime: Date.now(),
+                        hovered: -1,
+                        crt: null
+                    };
+                    self.notify('CHEAT: The Fates appear...');
+                } else {
+                    self.notify('Fates image not loaded');
                 }
                 self.cheatBuffer = '';
             }
@@ -1282,6 +1464,8 @@ TWB.Game.prototype.setupInput = function() {
             if (cb.slice(-4) === 'snow') {
                 self.snowing = !self.snowing;
                 self.snowTimer = self.snowing ? 5400 : 3600;
+                if (self.snowing) { TWB.Audio.startWind(1.5); }
+                else if (!self.windSpeed) { TWB.Audio.stopAmbient('wind_loop'); }
                 self.notify(self.snowing ? 'Snow ON' : 'Snow OFF');
                 self.cheatBuffer = '';
             }
@@ -1374,27 +1558,41 @@ TWB.Game.prototype.openMenu = function(obj, sx, sy) {
     };
 };
 
-TWB.Game.prototype.getMenuItemAt = function(sx, sy) {
-    if (!this.menu) return -1;
+TWB.Game.prototype.getMenuLayout = function() {
     var m = this.menu;
-    var menuW = 130;
-    var itemH = 22;
-    var padY = 6;
-    var mx = m.sx;
-    var my = m.sy;
+    if (!m) return null;
+    var ctx = this.ctx;
+    var padX = 10, padY = 6;
+    ctx.font = TWB.FONT_SM;
+    var maxW = 0;
+    for (var i = 0; i < m.items.length; i++) {
+        var tw = ctx.measureText(m.items[i].label).width;
+        if (tw > maxW) maxW = tw;
+    }
+    var metrics = ctx.measureText('M');
+    var itemH = (metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent) + padY * 2;
+    var menuW = maxW + padX * 2;
+    var menuH = m.items.length * itemH + padY * 2;
+    var mx = m.sx, my = m.sy;
     if (mx + menuW > this.canvas.width) mx = this.canvas.width - menuW - 4;
-    if (my + m.items.length * itemH + padY * 2 > this.canvas.height) my = this.canvas.height - m.items.length * itemH - padY * 2 - 4;
+    if (my + menuH > this.canvas.height) my = this.canvas.height - menuH - 4;
+    return { mx: mx, my: my, menuW: menuW, menuH: menuH, itemH: itemH, padX: padX, padY: padY };
+};
 
-    if (sx < mx || sx > mx + menuW) return -1;
-    var ry = sy - my - padY;
+TWB.Game.prototype.getMenuItemAt = function(sx, sy) {
+    var l = this.getMenuLayout();
+    if (!l) return -1;
+    if (sx < l.mx || sx > l.mx + l.menuW) return -1;
+    var ry = sy - l.my - l.padY;
     if (ry < 0) return -1;
-    var idx = Math.floor(ry / itemH);
-    if (idx >= m.items.length) return -1;
+    var idx = Math.floor(ry / l.itemH);
+    if (idx >= this.menu.items.length) return -1;
     return idx;
 };
 
 TWB.Game.prototype.notify = function(text, duration) {
     this.notification = { text: text, timer: duration || TWB.NOTIFY_TIME };
+    TWB.Audio.playSFX('notification', false, 0.3);
 };
 
 TWB.Game.prototype.getDay = function() {
@@ -1458,10 +1656,12 @@ TWB.ITEM_LABELS = {
 };
 
 TWB.ITEM_SHORT = {
-    vikosherb: 'Herb', canned_food: 'Canned', expired_food: 'Exp.Food',
+    vikosherb: 'Herb', canned_food: 'Can', expired_food: 'Exp.',
     fishing_rod: 'F.Rod', canteen_full: 'Water', olive_oil: 'Oil',
-    firewood: 'Fwood', lighter: 'Lightr', bandage: 'Bandge',
-    ski_goggles: 'Goggle', torn_map: 'Map', antenna: 'Antnna'
+    firewood: 'Fwood', lighter: 'Light', bandage: 'Band.',
+    ski_goggles: 'Goggl', torn_map: 'Map', antenna: 'Anten',
+    berries: 'Berry', shepherd_wool: 'Wool', shepherd_bell: 'Bell',
+    relic: 'Relic', sticks: 'Stick'
 };
 
 TWB.EDIBLE = { berries: true, food: true, canned_food: true };
@@ -1502,10 +1702,24 @@ TWB.TRAP_ANIMALS = [
 ];
 
 TWB.Game.prototype.getBackpackLayout = function() {
+    var ctx = this.ctx;
     var cols = 5;
     var rows = 2;
-    var slotSize = 52;
     var gap = 8;
+    var minSlot = 52;
+    ctx.font = TWB.FONT_XS;
+    var maxLabelW = 0;
+    for (var i = 0; i < this.backpack.length; i++) {
+        if (this.backpack[i]) {
+            var label = TWB.ITEM_LABELS[this.backpack[i].type] || this.backpack[i].type;
+            var words = label.split(' ');
+            for (var w = 0; w < words.length; w++) {
+                var ww = ctx.measureText(words[w]).width;
+                if (ww > maxLabelW) maxLabelW = ww;
+            }
+        }
+    }
+    var slotSize = Math.max(minSlot, maxLabelW + 12);
     var totalW = cols * slotSize + (cols - 1) * gap;
     var pw = totalW + 40;
     var hasBtns = this.backpackHover >= 0 && this.backpack[this.backpackHover];
@@ -1548,31 +1762,56 @@ TWB.Game.prototype.getBackpackBtnAt = function(sx, sy) {
     var btnH = 20;
     var gapX = 12;
     var gapY = 6;
-    var startX = l.px + Math.floor((l.pw - btnW * 2 - gapX) / 2);
+    var dName = this.getDogName();
+    if (dName.length > 6) dName = dName.substring(0, 5) + '.';
+    var btnLabels = { eat: 'Eat', feed: 'Feed ' + dName, drop1: 'Drop 1', dropall: 'Drop All', drink_canteen: 'Drink', dog_drink_canteen: 'Give ' + dName, use_bandage: 'Use' };
+    var ctx = this.ctx;
+    ctx.font = TWB.FONT_SM;
+    var btnWidths = [];
+    for (var bm = 0; bm < btns.length; bm++) {
+        var tw = ctx.measureText(btnLabels[btns[bm]]).width + 16;
+        btnWidths.push(Math.max(btnW, tw));
+    }
     for (var i = 0; i < btns.length; i++) {
         var col = i % 2;
         var row = Math.floor(i / 2);
-        var bx = startX + col * (btnW + gapX);
+        var rowStart = Math.floor(i / 2) * 2;
+        var w0 = btnWidths[rowStart] || btnW;
+        var w1 = btnWidths[rowStart + 1] || btnW;
+        var rowTotalW = w0 + gapX + w1;
+        var rowStartX = l.px + Math.floor((l.pw - rowTotalW) / 2);
+        var bx = col === 0 ? rowStartX : rowStartX + w0 + gapX;
+        var curBtnW = btnWidths[i];
         var by = baseY + row * (btnH + gapY);
-        if (sx >= bx && sx <= bx + btnW && sy >= by && sy <= by + btnH) return btns[i];
+        if (sx >= bx && sx <= bx + curBtnW && sy >= by && sy <= by + btnH) return btns[i];
     }
     return null;
 };
 
+TWB.Game.prototype.getGearAt = function(sx, sy) {
+    var iconSize = 22, iconGap = 4, cy = 12;
+    var iconY = cy + 36;
+    var gearSize = 18;
+    var gearX = this.canvas.width - 8 - gearSize;
+    var gearY = iconY + iconSize + 6;
+    return sx >= gearX && sx <= gearX + gearSize && sy >= gearY && sy <= gearY + gearSize;
+};
+
 TWB.Game.prototype.getIconAt = function(sx, sy) {
     var iconSize = 22, iconGap = 4;
-    var boxW = 90;
-    var cx = this.canvas.width - boxW - 8;
-    var cy = 12;
-    var iconY = cy + 34;
+    var pad = 4;
+    var cy = 8;
+    var boxH = 8 + pad * 2;
+    var iconY = cy + boxH + 4;
     var icons = [
         { key: 'TAB', label: 'B' },
         { key: 'M', label: 'M' },
         { key: 'C', label: 'C' },
-        { key: 'L', label: 'L' }
+        { key: 'L', label: 'L' },
+        { key: 'S', label: 'S' }
     ];
     var totalIconW = icons.length * iconSize + (icons.length - 1) * iconGap;
-    var iconStartX = cx - 6 + boxW - totalIconW;
+    var iconStartX = this.canvas.width - 8 - totalIconW;
     for (var i = 0; i < icons.length; i++) {
         var ix = iconStartX + i * (iconSize + iconGap);
         if (sx >= ix && sx <= ix + iconSize && sy >= iconY && sy <= iconY + iconSize) return icons[i].key;
@@ -1581,7 +1820,7 @@ TWB.Game.prototype.getIconAt = function(sx, sy) {
 };
 
 TWB.Game.prototype.getPanelCloseAt = function(sx, sy) {
-    var xSize = 14;
+    var xSize = 18;
     if (this.backpackOpen) {
         var l = this.getBackpackLayout();
         var xx = l.px + l.pw - xSize - 6;
@@ -1589,13 +1828,20 @@ TWB.Game.prototype.getPanelCloseAt = function(sx, sy) {
         if (sx >= xx && sx <= xx + xSize && sy >= xy && sy <= xy + xSize) return 'backpack';
     }
     if (this.craftingOpen) {
-        var pw = 280;
-        var ph = 30 + TWB.RECIPES.length * 24 + 10;
-        var px = Math.floor((this.canvas.width - pw) / 2);
-        var py = Math.floor((this.canvas.height - ph) / 2) - 20;
-        var xx2 = px + pw - xSize - 6;
-        var xy2 = py + 4;
+        var cpw = 300;
+        var cItemH = 32;
+        var cph = 28 + 14 + TWB.RECIPES.length * (cItemH + 4) + 14;
+        var cpx = Math.floor((this.canvas.width - cpw) / 2);
+        var cpy = Math.floor((this.canvas.height - cph) / 2) - 20;
+        var xx2 = cpx + cpw - xSize - 6;
+        var xy2 = cpy + 6;
         if (sx >= xx2 && sx <= xx2 + xSize && sy >= xy2 && sy <= xy2 + xSize) return 'crafting';
+    }
+    if (this.settingsOpen) {
+        var sl = this.getSettingsLayout();
+        var xx3 = sl.px + sl.pw - xSize - 6;
+        var xy3 = sl.py + 6;
+        if (sx >= xx3 && sx <= xx3 + xSize && sy >= xy3 && sy <= xy3 + xSize) return 'settings';
     }
     return null;
 };
@@ -1611,12 +1857,14 @@ TWB.Game.prototype.executeAction = function(obj, action) {
             if (idx >= 0) this.objects.splice(idx, 1);
             s.energy = Math.max(0, s.energy - 12);
             this.wolfStats.energy = Math.max(0, this.wolfStats.energy - 3);
+            TWB.Audio.playSFX('chop_stick', false, 0.5);
             msg = '+1 Wood';
             break;
         case 'gather':
             if (s.energy < 3) { msg = TWB.MSG_TIRED; break; }
             if (!this.addToBackpack('sticks', 1)) { msg = TWB.MSG_FULL; break; }
             s.energy = Math.max(0, s.energy - 4);
+            TWB.Audio.playSFX('chop_stick', false, 0.4);
             msg = '+1 Sticks';
             break;
         case 'mine':
@@ -1626,6 +1874,7 @@ TWB.Game.prototype.executeAction = function(obj, action) {
             if (idx2 >= 0) this.objects.splice(idx2, 1);
             s.energy = Math.max(0, s.energy - 15);
             this.wolfStats.energy = Math.max(0, this.wolfStats.energy - 3);
+            TWB.Audio.playSFX('chop_stick', false, 0.5);
             msg = '+1 Stone';
             break;
         case 'mine_boulder':
@@ -1634,6 +1883,7 @@ TWB.Game.prototype.executeAction = function(obj, action) {
             obj.hits++;
             s.energy = Math.max(0, s.energy - 20);
             this.wolfStats.energy = Math.max(0, this.wolfStats.energy - 5);
+            TWB.Audio.playSFX('chop_stick', false, 0.5);
             if (obj.hits >= 3) {
                 var added = this.addToBackpack('stone', 3);
                 if (!added) { msg = TWB.MSG_FULL; obj.hits--; break; }
@@ -1652,6 +1902,7 @@ TWB.Game.prototype.executeAction = function(obj, action) {
             if (!this.addToBackpack('berries', 1)) { msg = TWB.MSG_FULL; break; }
             obj.berries--;
             s.energy = Math.max(0, s.energy - 2);
+            TWB.Audio.playSFX('item_pickup', false, 0.3);
             if (obj.berries <= 0) {
                 obj.type = 'bush';
                 msg = '+1 Berries (bush empty)';
@@ -1665,11 +1916,12 @@ TWB.Game.prototype.executeAction = function(obj, action) {
             if (!this.addToBackpack('vikosherb', 1)) { msg = TWB.MSG_FULL; break; }
             obj.picked = true;
             s.energy = Math.max(0, s.energy - 2);
+            TWB.Audio.playSFX('item_pickup', false, 0.3);
             msg = '+1 3-Leaf Herb';
             break;
         case 'burn_herb':
         case 'burn_herb_fp':
-            var bhIsFP = item.action === 'burn_herb_fp';
+            var bhIsFP = action.action === 'burn_herb_fp';
             var bhFuel = bhIsFP ? this.fireplaceFuel : ((obj.tempFuel !== undefined) ? obj.tempFuel : this.fireFuel);
             if (bhFuel <= 0) { msg = bhIsFP ? 'Light the fireplace first!' : 'Fire is out!'; break; }
             if (this.getItemCount('vikosherb') <= 0) { msg = 'No herb to burn!'; break; }
@@ -1680,7 +1932,7 @@ TWB.Game.prototype.executeAction = function(obj, action) {
             break;
         case 'cook':
         case 'cook_fp':
-            var ckIsFP = item.action === 'cook_fp';
+            var ckIsFP = action.action === 'cook_fp';
             var cookFuel = ckIsFP ? this.fireplaceFuel : ((obj.tempFuel !== undefined) ? obj.tempFuel : this.fireFuel);
             if (cookFuel <= 0) { msg = ckIsFP ? 'Light the fireplace first!' : 'Fire is out!'; break; }
             var ingredient = null;
@@ -1833,6 +2085,7 @@ TWB.Game.prototype.executeAction = function(obj, action) {
                     this.wolfStats.mood = isShadowTrap2 ? 'Terrified' : 'Alert';
                     var dkImgs3 = ['cut-scene-door-knock-1', 'cut-scene-door-knock-2'];
                     var dkKey3 = dkImgs3[Math.floor(Math.random() * dkImgs3.length)];
+                    TWB.Audio.playSFX('door_knock', false, 0.6);
                     if (TWB.CutsceneImages[dkKey3]) {
                         var dkTxt3 = (this.playerName || 'Player') + ': ' + TWB.DOOR_KNOCK_COMMENTS[Math.floor(Math.random() * TWB.DOOR_KNOCK_COMMENTS.length)];
                         this.doorKnockCutscene = { img: TWB.CutsceneImages[dkKey3], timer: 0, startTime: Date.now(), comment: dkTxt3, hovered: null, fromSleep: true };
@@ -1875,6 +2128,7 @@ TWB.Game.prototype.executeAction = function(obj, action) {
                     this.cabinSearches[searchKey]--;
                     break;
                 }
+                TWB.Audio.playSFX('item_pickup', false, 0.3);
                 msg = 'Found Lighter!';
                 this.runStats.itemsFound++;
                 break;
@@ -1887,6 +2141,7 @@ TWB.Game.prototype.executeAction = function(obj, action) {
                     break;
                 }
                 sqItem.callback();
+                TWB.Audio.playSFX('item_pickup', false, 0.3);
                 msg = sqItem.msg;
                 this.runStats.itemsFound++;
                 break;
@@ -1898,6 +2153,7 @@ TWB.Game.prototype.executeAction = function(obj, action) {
                 this.cabinSearches[searchKey]--;
                 break;
             }
+            TWB.Audio.playSFX('item_pickup', false, 0.3);
             msg = 'Found ' + (TWB.ITEM_LABELS[found] || found) + '!';
             this.runStats.itemsFound++;
             break;
@@ -1920,6 +2176,7 @@ TWB.Game.prototype.executeAction = function(obj, action) {
         // cook_fp handled above in 'cook' case
         case 'drink':
             if (s.thirst >= 95) { msg = 'Not thirsty'; break; }
+            TWB.Audio.playSFX('drink', false, 0.5);
             if (Math.random() < 0.1) {
                 s.health = Math.max(0, s.health - 15);
                 s.thirst = Math.min(100, s.thirst + 30);
@@ -1943,6 +2200,7 @@ TWB.Game.prototype.executeAction = function(obj, action) {
             break;
         case 'drink_fountain':
             if (s.thirst >= 95) { msg = 'Not thirsty'; break; }
+            TWB.Audio.playSFX('drink', false, 0.5);
             s.thirst = Math.min(100, s.thirst + 45);
             msg = 'Drank clean spring water (+45 thirst)';
             break;
@@ -1956,6 +2214,7 @@ TWB.Game.prototype.executeAction = function(obj, action) {
             if (this.getItemCount('canteen') < 1) { msg = 'No canteen! Craft one [C]'; break; }
             this.removeFromBackpack('canteen', 1);
             this.addToBackpack('canteen_full', 1);
+            TWB.Audio.playSFX('drink', false, 0.4);
             msg = 'Filled canteen with water';
             break;
         case 'fish':
@@ -2151,6 +2410,12 @@ TWB.Game.prototype.executeAction = function(obj, action) {
             break;
         case 'pray_shrine':
             if (!obj.lit) { msg = 'The shrine is cold and dark...'; break; }
+            var curHour = Math.floor(this.gameTime / 60);
+            if (this._lastPrayHour !== undefined && curHour - this._lastPrayHour < 1) {
+                msg = 'You need to wait before praying again.';
+                break;
+            }
+            this._lastPrayHour = curHour;
             s.energy = Math.min(100, s.energy + 8);
             this.wolfStats.energy = Math.min(100, this.wolfStats.energy + 5);
             msg = 'A moment of peace. You feel rested.';
@@ -2426,6 +2691,7 @@ TWB.Game.prototype.enterCabin = function() {
     this.wolf.moving = false;
     this.indoors = true;
     TWB.indoors = true;
+    TWB.Audio.playSFX('door_opening', false, 0.5);
     this.runStats.cabinsVisited[this.currentCabinIdx] = true;
     this.menu = null;
     this.barricaded = TWB._cabinData[nearestIdx].barricaded || false;
@@ -2478,7 +2744,7 @@ TWB.Game.prototype.update = function() {
     if (this.missionBrief) return;
     if (this.victory) { this.victoryTimer++; return; }
     if (this.dead) { this.deathTimer++; return; }
-    if (this.fates && this.fates.fade >= 1) return;
+    if (this.fates) return;
     if (this.elderDialogue) return;
 
     if (this.tutorialMode) {
@@ -2577,7 +2843,28 @@ TWB.Game.prototype.update = function() {
                 if (this.footprints.length > 200) this.footprints.shift();
             }
         }
+        TWB.Audio.startFootsteps();
+    } else {
+        TWB.Audio.stopFootsteps();
     }
+
+    var fireVol = 0;
+    var fireRange = 300;
+    if (this.indoors && this.fireplaceFuel > 0) {
+        fireVol = 0.5;
+    }
+    for (var fi = 0; fi < this.objects.length; fi++) {
+        var fo = this.objects[fi];
+        if (fo.type !== 'campfire' && fo.type !== 'fireplace') continue;
+        var fFuel = fo.tempFuel !== undefined ? fo.tempFuel : this.fireFuel;
+        if (fFuel <= 0) continue;
+        var fDist = TWB.dist(this.player.x, this.player.y, fo.x, fo.y);
+        if (fDist < fireRange) {
+            var fv = (1 - fDist / fireRange) * 0.5;
+            if (fv > fireVol) fireVol = fv;
+        }
+    }
+    TWB.Audio.updateFire(fireVol);
 
     if (this.fleeing) {
         var cabin = null;
@@ -2654,6 +2941,10 @@ TWB.Game.prototype.update = function() {
             this.stats.health = Math.max(0, this.stats.health - 5);
             this.wolfStats.health = Math.max(0, this.wolfStats.health - 3);
             this.notify(this.predator.name + ' attacks! -5 HP', TWB.NOTIFY_SHORT);
+            TWB.Audio.playSFX('dog_bark', false, 0.5);
+        }
+        if (ppd < 120 && this.gameTime % 180 === 0) {
+            TWB.Audio.playSFX('dog_bark', false, 0.35);
         }
 
         this.predator.timer--;
@@ -2681,11 +2972,18 @@ TWB.Game.prototype.update = function() {
             if (ds.timer === 1) {
                 this.notify(this.getDogName() + ' stopped... ears up.', TWB.NOTIFY_SHORT);
             }
+            if (ds.timer === 40 || ds.timer === 70) {
+                TWB.Audio.playSFX('dog_bark', false, 0.35);
+            }
             if (ds.timer > 90) { ds.phase = 2; ds.timer = 0; }
         } else if (ds.phase === 2) {
             this.wolf.moving = false;
             if (ds.timer === 1) {
                 this.notify('GRRRR...', TWB.NOTIFY_SHORT);
+                TWB.Audio.playSFX('dog_bark', false, 0.5);
+            }
+            if (ds.timer === 50) {
+                TWB.Audio.playSFX('dog_bark', false, 0.5);
             }
             if (ds.timer % 20 < 10) {
                 this.wolf.dir = senseDir;
@@ -2722,7 +3020,7 @@ TWB.Game.prototype.update = function() {
         var dogSniffTarget = null;
         for (var dsi = 0; dsi < this.objects.length; dsi++) {
             var dsObj = this.objects[dsi];
-            if (dsObj.type === 'shepherd_wool' || dsObj.type === 'shepherd_bell' || dsObj.type === 'shepherd_tracks') {
+            if (dsObj.type === 'shepherd_wool' || dsObj.type === 'shepherd_bell') {
                 var dsd = TWB.dist(dsObj.x, dsObj.y, this.wolf.x, this.wolf.y);
                 if (dsd < 300 && (!dogSniffTarget || dsd < dogSniffTarget.dist)) {
                     dogSniffTarget = { x: dsObj.x, y: dsObj.y, dist: dsd };
@@ -2754,7 +3052,7 @@ TWB.Game.prototype.update = function() {
         var iw = TWB.INTERIOR_COLS * TWB.TILE;
         var ih = TWB.INTERIOR_ROWS * TWB.TILE;
         this.camera.x = (iw - this.canvas.width) / 2;
-        this.camera.y = (ih - (this.canvas.height - 80)) / 2;
+        this.camera.y = (ih - (this.canvas.height - Math.floor(this.canvas.height * 0.15))) / 2;
     } else {
         this.camera.follow(this.player.x, this.player.y);
     }
@@ -2839,6 +3137,7 @@ TWB.Game.prototype.update = function() {
     if (this.windTimer <= 0) {
         this.windSpeed = Math.random() * Math.random() * 3;
         this.windTimer = 600 + Math.floor(Math.random() * 1800);
+        TWB.Audio.startWind(this.windSpeed);
     }
 
     this.fogTimer--;
@@ -2871,19 +3170,24 @@ TWB.Game.prototype.update = function() {
         if (this.fatesTimer <= 0) {
             if (this.stats.energy < 35) {
                 var qi = Math.floor(Math.random() * this.fatesQuestions.length);
+                var fateImg = TWB.CutsceneImages['cute-scene-fate-1'];
+                var fq = this.fatesQuestions[qi];
+                var swapped = Math.random() < 0.5;
+                var dispA = swapped ? [fq.a[1], fq.a[0]] : [fq.a[0], fq.a[1]];
+                var dispCorrect = swapped ? 1 : 0;
                 this.fates = {
-                    question: this.fatesQuestions[qi],
-                    x: this.player.x + (Math.random() > 0.5 ? 60 : -60),
-                    y: this.player.y - 40,
+                    question: { q: fq.q, a: dispA, correct: dispCorrect },
+                    img: fateImg || null,
+                    startTime: Date.now(),
                     hovered: -1,
-                    fade: 0
+                    crt: null
                 };
             }
             this.fatesTimer = 5400 + Math.floor(Math.random() * 7200);
         }
     }
-    if (this.fates) {
-        this.fates.fade = Math.min(1, this.fates.fade + 0.006);
+    if (this.fates && !this.fates.img) {
+        this.fates = null;
     }
 
     // === SHEPHERD MAN UPDATE ===
@@ -2996,7 +3300,6 @@ TWB.Game.prototype.update = function() {
                 this.shepherdDone = true;
                 var smItemX = this.player.x + (Math.random() - 0.5) * 60;
                 var smItemY = this.player.y + 40 + Math.random() * 40;
-                this.objects.push({ type: 'shepherd_tracks', x: smItemX, y: smItemY, solid: false });
                 this.objects.push({ type: 'shepherd_wool', x: smItemX + 20 + Math.random() * 30, y: smItemY + 10 + Math.random() * 20, solid: false });
                 this.objects.push({ type: 'shepherd_bell', x: smItemX - 10 + Math.random() * 20, y: smItemY + 30 + Math.random() * 20, solid: false });
                 if (!this.dogStolen) {
@@ -3047,6 +3350,24 @@ TWB.Game.prototype.update = function() {
         }
         if (!this.indoors) {
             this.runStats.nightsOut++;
+            if (!this.nightCutsceneDone) {
+                var nightImgs = ['cut-scene-night-1', 'cut-scene-night-2'];
+                var nightImgKey = nightImgs[Math.floor(Math.random() * nightImgs.length)];
+                if (TWB.CutsceneImages[nightImgKey]) {
+                    var nightComments = [
+                        'The darkness is swallowing everything...',
+                        'Night is falling fast... I need to find shelter.',
+                        'The shadows are growing longer... this isn\'t good.',
+                        'It\'s getting dark... the forest feels different now.',
+                        'I can barely see my hands... I need light.',
+                        'The night has teeth out here...'
+                    ];
+                    var ncTxt = (this.playerName || 'Player') + ': ' + nightComments[Math.floor(Math.random() * nightComments.length)];
+                    this.shepherdCutscene = { img: TWB.CutsceneImages[nightImgKey], timer: 0, startTime: Date.now(), comment: ncTxt };
+                    this.nightCutsceneDone = true;
+                    this.player.moving = false;
+                }
+            }
             var ntMsg = 'Darkness falls... find shelter!';
             if (this.nightType === 'freeze') ntMsg = 'A freezing storm approaches... find shelter!';
             else if (this.nightType === 'shadow_surge') ntMsg = 'The darkness feels alive tonight... find shelter!';
@@ -3234,8 +3555,10 @@ TWB.Game.prototype.update = function() {
                     };
                     this.doorShake = 90;
                     this.wolfStats.mood = isShadowTrap ? 'Terrified' : 'Alert';
+                    TWB.Audio.playSFX('dog_bark', false, 0.5);
                     var dkImgs = ['cut-scene-door-knock-1', 'cut-scene-door-knock-2'];
                     var dkKey = dkImgs[Math.floor(Math.random() * dkImgs.length)];
+                    TWB.Audio.playSFX('door_knock', false, 0.6);
                     if (TWB.CutsceneImages[dkKey]) {
                         var dkTxt = (this.playerName || 'Player') + ': ' + TWB.DOOR_KNOCK_COMMENTS[Math.floor(Math.random() * TWB.DOOR_KNOCK_COMMENTS.length)];
                         this.doorKnockCutscene = { img: TWB.CutsceneImages[dkKey], timer: 0, startTime: Date.now(), comment: dkTxt, hovered: null };
@@ -3656,6 +3979,7 @@ TWB.Game.prototype.update = function() {
                     angle: pAngle,
                     pred: pred
                 };
+                TWB.Audio.playSFX('dog_bark', false, 0.5);
             }
         }
 
@@ -3748,6 +4072,7 @@ TWB.Game.prototype.update = function() {
             this.raining = false;
             this.recentRain = 3600;
             this.rainTimer = 5400 + Math.floor(Math.random() * 10800);
+            TWB.Audio.stopRain();
             this.notify('The rain stopped.');
             for (var ri = 0; ri < this.objects.length; ri++) {
                 if (this.objects[ri].type === 'bush' && Math.random() < 0.5) {
@@ -3785,6 +4110,7 @@ TWB.Game.prototype.update = function() {
                 this.raining = true;
                 this.rainTimer = 1800 + Math.floor(Math.random() * 5400);
                 this.runStats.storms++;
+                TWB.Audio.startRain();
                 this.notify('It started raining...');
             } else {
                 this.rainTimer = 1800;
@@ -3802,6 +4128,7 @@ TWB.Game.prototype.update = function() {
         if (this.snowing) {
             this.snowing = false;
             this.snowTimer = 7200 + Math.floor(Math.random() * 14400);
+            if (!this.windSpeed) TWB.Audio.stopAmbient('wind_loop');
             this.notify('The snow stopped.');
         } else if (!this.raining) {
             var sHour = this.getGameHour();
@@ -3809,6 +4136,7 @@ TWB.Game.prototype.update = function() {
                 this.snowing = true;
                 this.snowTimer = 2700 + Math.floor(Math.random() * 7200);
                 this.runStats.storms++;
+                TWB.Audio.startWind(1.5);
                 this.notify('It started snowing...');
             } else {
                 this.snowTimer = 1800;
@@ -3857,7 +4185,7 @@ TWB.Game.prototype.update = function() {
             var txt;
             if (!this.dogStolen && Math.random() < 0.2) {
                 var di = Math.floor(Math.random() * TWB.DOG_COMMENTS.length);
-                txt = pn + ': My favorite ' + dn + ', ' + TWB.DOG_COMMENTS[di];
+                txt = pn + ': My dear, ' + dn + ', ' + TWB.DOG_COMMENTS[di];
             } else {
                 var ci = Math.floor(Math.random() * TWB.PLAYER_COMMENTS.length);
                 txt = pn + ': ' + TWB.PLAYER_COMMENTS[ci];
@@ -4196,6 +4524,7 @@ TWB.Game.prototype.render = function() {
     if (this.distortion > 0.1 && this.indoors) this.drawDistortion();
     if (TWB._scenario === 'CURSE' && !this.indoors) this.drawCurseEffects();
     this.drawClock();
+    this.drawSettings();
     this.drawObjective();
     this.drawHUD();
     if (this.backpackOpen) this.drawBackpack();
@@ -4837,6 +5166,21 @@ TWB.Game.prototype.drawFire = function() {
         }
         ctx.fillStyle = glow;
         ctx.fillRect(fx - glowR - 10, fy - glowR - 10, glowR * 2 + 20, glowR * 2 + 20);
+
+        var fbW = 30, fbH = 3;
+        var fbX = fx - fbW / 2;
+        var fbY = fy - 24;
+        ctx.fillStyle = 'rgba(40,20,10,0.7)';
+        ctx.fillRect(fbX, fbY, fbW, fbH);
+        var fuelClr = fuelPct > 0.4 ? '#c07020' : fuelPct > 0.15 ? '#a05010' : '#802010';
+        ctx.fillStyle = fuelClr;
+        ctx.fillRect(fbX, fbY, Math.floor(fbW * fuelPct), fbH);
+        ctx.font = TWB.FONT_XS;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillStyle = TWB.CLR_TEXT_DIM;
+        ctx.fillText(Math.floor(fuel), fx, fbY - 1);
+        ctx.textAlign = 'left';
     }
 
     for (var si = 0; si < this.objects.length; si++) {
@@ -5147,31 +5491,38 @@ TWB.Game.prototype.drawMysteryGlow = function() {
 
 TWB.Game.prototype.drawCloseBtn = function(x, y) {
     var ctx = this.ctx;
-    var s = 14;
+    var s = 18;
     ctx.fillStyle = 'rgba(60,20,20,0.7)';
     ctx.fillRect(x, y, s, s);
     ctx.strokeStyle = '#804040';
     ctx.lineWidth = 1;
     ctx.strokeRect(x, y, s, s);
     ctx.strokeStyle = '#cc6060';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(x + 3, y + 3); ctx.lineTo(x + s - 3, y + s - 3); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(x + s - 3, y + 3); ctx.lineTo(x + 3, y + s - 3); ctx.stroke();
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x + 4, y + 4); ctx.lineTo(x + s - 4, y + s - 4); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x + s - 4, y + 4); ctx.lineTo(x + 4, y + s - 4); ctx.stroke();
 };
 
 TWB.Game.prototype.drawObjective = function() {
     var sd = TWB._scenarioData;
     if (!sd.objectiveText) return;
     var ctx = this.ctx;
+    var pad = 4;
     ctx.save();
     ctx.font = TWB.FONT_XS;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.fillStyle = 'rgba(0,0,0,0.5)';
     var tw = ctx.measureText(sd.objectiveText).width;
-    ctx.fillRect(4, 42, tw + 10, 14);
+    var bw = tw + pad * 2;
+    var bh = 8 + pad * 2;
+    var oy = 8 + 8 + pad * 2 + 4;
+    ctx.fillStyle = 'rgba(6,6,10,0.8)';
+    ctx.fillRect(8, oy, bw, bh);
+    ctx.strokeStyle = TWB.CLR_BORDER_DARK;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(8, oy, bw, bh);
     ctx.fillStyle = '#b8a060';
-    ctx.fillText(sd.objectiveText, 9, 46);
+    ctx.fillText(sd.objectiveText, 8 + pad, oy + pad);
     ctx.restore();
 };
 
@@ -5222,21 +5573,24 @@ TWB.Game.prototype.drawClock = function() {
     if (this.nightActive && this.nightType === 'freeze') periodSuffix = ' STORM';
     else if (this.nightActive && this.nightType === 'shadow_surge') periodSuffix = ' DARK';
     var periodStr = period + periodSuffix;
+    var clockStr = periodStr + ' - ' + timeStr;
     ctx.font = TWB.FONT_SM;
-    var periodW = ctx.measureText(periodStr).width;
-    var boxW = Math.max(90, periodW + 16);
-    var cx = this.canvas.width - boxW - 8;
-    var cy = 12;
+    var pad = 4;
+    var clockW = ctx.measureText(clockStr).width;
+    var boxW = clockW + pad * 2;
+    var boxH = 8 + pad * 2;
+    var cy = 8;
 
-    var iconSize = 22, iconGap = 4, iconY = cy + 34;
+    var iconSize = 22, iconGap = 4, iconY = cy + boxH + 4;
     var icons = [
         { key: 'TAB', active: this.backpackOpen, label: 'B' },
         { key: 'M', active: this.mapOpen, label: 'M' },
         { key: 'C', active: this.craftingOpen, label: 'C' },
-        { key: 'L', active: this.flashlightOn, label: 'L' }
+        { key: 'L', active: this.flashlightOn, label: 'L' },
+        { key: 'S', active: this.settingsOpen, label: 'S' }
     ];
     var totalIconW = icons.length * iconSize + (icons.length - 1) * iconGap;
-    var iconStartX = cx - 6 + boxW - totalIconW;
+    var iconStartX = this.canvas.width - 8 - totalIconW;
 
     for (var ii = 0; ii < icons.length; ii++) {
         var icon = icons[ii];
@@ -5250,46 +5604,14 @@ TWB.Game.prototype.drawClock = function() {
         ctx.lineWidth = 1;
         ctx.strokeRect(ix, iy, iconSize, iconSize);
 
-        var col = icon.active ? TWB.CLR_GOLD : hovered ? '#b0b0c0' : TWB.CLR_TEXT_ICON;
-        if (icon.label === 'B') {
-            ctx.fillStyle = col;
-            ctx.fillRect(ix + 5, iy + 4, 12, 14);
-            ctx.fillStyle = icon.active ? 'rgba(212,164,74,0.25)' : hovered ? 'rgba(40,40,60,0.8)' : 'rgba(6,6,10,0.6)';
-            ctx.fillRect(ix + 7, iy + 7, 4, 4);
-            ctx.fillRect(ix + 12, iy + 7, 3, 4);
-        } else if (icon.label === 'M') {
-            ctx.fillStyle = col;
-            ctx.fillRect(ix + 4, iy + 4, 14, 14);
-            ctx.strokeStyle = icon.active ? '#1a1a0a' : TWB.CLR_BORDER_DARK;
-            ctx.lineWidth = 0.5;
-            ctx.beginPath(); ctx.moveTo(ix + 7, iy + 4); ctx.lineTo(ix + 7, iy + 18); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(ix + 11, iy + 4); ctx.lineTo(ix + 11, iy + 18); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(ix + 15, iy + 4); ctx.lineTo(ix + 15, iy + 18); ctx.stroke();
-        } else if (icon.label === 'C') {
-            ctx.strokeStyle = col;
-            ctx.lineWidth = 2;
-            ctx.beginPath(); ctx.moveTo(ix + 6, iy + 5); ctx.lineTo(ix + 6, iy + 17); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(ix + 16, iy + 5); ctx.lineTo(ix + 16, iy + 17); ctx.stroke();
-            ctx.lineWidth = 1;
-            ctx.beginPath(); ctx.moveTo(ix + 6, iy + 8); ctx.lineTo(ix + 16, iy + 8); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(ix + 6, iy + 14); ctx.lineTo(ix + 16, iy + 14); ctx.stroke();
-        } else if (icon.label === 'L') {
-            ctx.fillStyle = icon.active ? TWB.CLR_GOLD_LIGHT : col;
-            ctx.beginPath();
-            ctx.moveTo(ix + 8, iy + 4);
-            ctx.lineTo(ix + 14, iy + 4);
-            ctx.lineTo(ix + 15, iy + 11);
-            ctx.lineTo(ix + 7, iy + 11);
-            ctx.closePath();
-            ctx.fill();
-            ctx.fillRect(ix + 8, iy + 12, 6, 3);
-            if (icon.active) {
-                ctx.strokeStyle = TWB.CLR_GOLD_LIGHT;
-                ctx.lineWidth = 0.5;
-                ctx.beginPath(); ctx.moveTo(ix + 11, iy + 16); ctx.lineTo(ix + 11, iy + 19); ctx.stroke();
-                ctx.beginPath(); ctx.moveTo(ix + 5, iy + 15); ctx.lineTo(ix + 3, iy + 18); ctx.stroke();
-                ctx.beginPath(); ctx.moveTo(ix + 17, iy + 15); ctx.lineTo(ix + 19, iy + 18); ctx.stroke();
-            }
+        var iconImgKey = icon.label === 'B' ? 'backpack' : icon.label === 'M' ? 'map' : icon.label === 'C' ? 'craft' : icon.label === 'L' ? 'light' : 'settings';
+        var iconImg = TWB.HudIcons[iconImgKey];
+        if (iconImg) {
+            ctx.save();
+            ctx.imageSmoothingEnabled = false;
+            if (!icon.active && !hovered) ctx.globalAlpha = 0.6;
+            ctx.drawImage(iconImg, ix + 1, iy + 1, iconSize - 2, iconSize - 2);
+            ctx.restore();
         }
 
         if (hovered) {
@@ -5301,44 +5623,164 @@ TWB.Game.prototype.drawClock = function() {
         }
     }
 
+    var rightEdge = this.canvas.width - 8;
     ctx.fillStyle = 'rgba(6,6,10,0.8)';
-    ctx.fillRect(cx - 6, cy - 4, boxW, 30);
+    ctx.fillRect(rightEdge - boxW, cy, boxW, boxH);
     ctx.strokeStyle = TWB.CLR_BORDER_DARK;
     ctx.lineWidth = 1;
-    ctx.strokeRect(cx - 6, cy - 4, boxW, 30);
-
-    ctx.font = TWB.FONT_LG;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillStyle = TWB.CLR_GOLD;
-    ctx.fillText(timeStr, cx, cy);
+    ctx.strokeRect(rightEdge - boxW, cy, boxW, boxH);
 
     ctx.font = TWB.FONT_SM;
-    var periodColor = hour < 5 ? TWB.CLR_BLUE_DARK : hour < 7 ? '#d08040' : hour < 12 ? '#a0a060' : hour < 17 ? '#c0b060' : hour < 20 ? '#c08030' : TWB.CLR_BLUE_DARK;
-    ctx.fillStyle = periodColor;
-    ctx.fillText(periodStr, cx, cy + 16);
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = TWB.CLR_GOLD;
+    ctx.fillText(clockStr, rightEdge - pad, cy + pad);
 
+    ctx.textAlign = 'left';
     var temp = this.getTemperature();
     var exposure = this.getExposureState();
     var expColors = [TWB.CLR_GREEN_PALE, '#c0c060', '#d09040', '#6090d0', '#4060c0'];
-    var tempBoxW = 52;
-    var tx = 8;
-    var ty = 12;
-    var boxH = exposure.level > 0 ? 34 : 22;
+    var tempStr = temp + '°C';
+    if (exposure.level > 0) tempStr += ' ' + exposure.label;
+    ctx.font = TWB.FONT_SM;
+    var tempW = ctx.measureText(tempStr).width;
+    var tempBoxW = tempW + pad * 2;
+    var tempBoxH = 8 + pad * 2;
     ctx.fillStyle = 'rgba(6,6,10,0.8)';
-    ctx.fillRect(tx - 4, ty - 4, tempBoxW, boxH);
+    ctx.fillRect(8, cy, tempBoxW, tempBoxH);
     ctx.strokeStyle = TWB.CLR_BORDER_DARK;
     ctx.lineWidth = 1;
-    ctx.strokeRect(tx - 4, ty - 4, tempBoxW, boxH);
-    ctx.font = TWB.FONT_SM;
+    ctx.strokeRect(8, cy, tempBoxW, tempBoxH);
     ctx.fillStyle = expColors[exposure.level];
-    ctx.fillText(temp + '°C', tx, ty);
-    if (exposure.level > 0) {
-        ctx.font = TWB.FONT_XS;
-        ctx.fillText(exposure.label, tx, ty + 14);
-    }
+    ctx.fillText(tempStr, 8 + pad, cy + pad);
 
     ctx.textAlign = 'left';
+};
+
+TWB.Game.prototype.getSettingsLayout = function() {
+    var pw = 220, ph = 130;
+    var px = Math.floor((this.canvas.width - pw) / 2);
+    var py = Math.floor((this.canvas.height - ph) / 2) - 20;
+    return { px: px, py: py, pw: pw, ph: ph };
+};
+
+TWB.Game.prototype.drawSettings = function() {
+    if (!this.settingsOpen) return;
+    var ctx = this.ctx;
+    var l = this.getSettingsLayout();
+
+    ctx.fillStyle = 'rgba(6,6,10,0.92)';
+    ctx.fillRect(l.px, l.py, l.pw, l.ph);
+    ctx.strokeStyle = TWB.CLR_BORDER;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(l.px, l.py, l.pw, l.ph);
+
+    this.drawCloseBtn(l.px + l.pw - 24, l.py + 6);
+
+    ctx.font = TWB.FONT_SM;
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = TWB.CLR_GOLD;
+    ctx.textAlign = 'left';
+    ctx.fillText('SETTINGS', l.px + 10, l.py + 8);
+
+    ctx.font = TWB.FONT_XS;
+
+    var sx = l.px + 10;
+    var sy = l.py + 30;
+    ctx.fillStyle = TWB.CLR_TEXT_DIM;
+    ctx.fillText('VOLUME', sx, sy);
+
+    var sliderX = sx;
+    var sliderY = sy + 16;
+    var sliderW = l.pw - 20;
+    var sliderH = 8;
+    ctx.fillStyle = 'rgba(40,40,60,0.8)';
+    ctx.fillRect(sliderX, sliderY, sliderW, sliderH);
+    ctx.strokeStyle = TWB.CLR_BORDER;
+    ctx.strokeRect(sliderX, sliderY, sliderW, sliderH);
+
+    var fillW = Math.round(sliderW * this.audioVolume);
+    ctx.fillStyle = this.audioMuted ? TWB.CLR_TEXT_DIM : TWB.CLR_GOLD;
+    ctx.fillRect(sliderX, sliderY, fillW, sliderH);
+
+    var knobX = sliderX + fillW - 2;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(knobX, sliderY - 1, 4, sliderH + 2);
+
+    var muteY = sliderY + sliderH + 12;
+    var muteW = 12, muteH = 12;
+    ctx.fillStyle = this.audioMuted ? 'rgba(212,164,74,0.3)' : 'rgba(40,40,60,0.8)';
+    ctx.fillRect(sx, muteY, muteW, muteH);
+    ctx.strokeStyle = this.audioMuted ? TWB.CLR_GOLD : TWB.CLR_BORDER;
+    ctx.strokeRect(sx, muteY, muteW, muteH);
+    if (this.audioMuted) {
+        ctx.fillStyle = TWB.CLR_GOLD;
+        ctx.fillRect(sx + 3, muteY + 3, 6, 6);
+    }
+    ctx.fillStyle = TWB.CLR_TEXT_DIM;
+    ctx.fillText('MUTE', sx + muteW + 6, muteY + 2);
+
+    var menuBtnY = muteY + muteH + 14;
+    var menuBtnW = l.pw - 20;
+    var menuBtnH = 16;
+    this._settingsMenuBtnY = menuBtnY;
+    ctx.fillStyle = 'rgba(80,30,30,0.6)';
+    ctx.fillRect(sx, menuBtnY, menuBtnW, menuBtnH);
+    ctx.strokeStyle = '#804040';
+    ctx.strokeRect(sx, menuBtnY, menuBtnW, menuBtnH);
+    ctx.fillStyle = '#cc6060';
+    ctx.font = TWB.FONT_XS;
+    ctx.textAlign = 'center';
+    ctx.fillText('BACK TO MAIN MENU', sx + menuBtnW / 2, menuBtnY + 4);
+
+    ctx.textAlign = 'left';
+};
+
+TWB.Game.prototype.handleSettingsClick = function(sx, sy) {
+    if (!this.settingsOpen) return false;
+    var l = this.getSettingsLayout();
+    if (sx < l.px || sx > l.px + l.pw || sy < l.py || sy > l.py + l.ph) {
+        this.settingsOpen = false;
+        return true;
+    }
+
+    var sliderX = l.px + 10;
+    var sliderY = l.py + 46;
+    var sliderW = l.pw - 20;
+    var sliderH = 8;
+    if (sx >= sliderX && sx <= sliderX + sliderW && sy >= sliderY - 4 && sy <= sliderY + sliderH + 4) {
+        this.audioVolume = Math.max(0, Math.min(1, (sx - sliderX) / sliderW));
+        this.settingsSliderDrag = true;
+        if (TWB.Audio.master) TWB.Audio.master.gain.value = this.audioMuted ? 0 : this.audioVolume;
+        return true;
+    }
+
+    var muteY = sliderY + sliderH + 12;
+    var muteW = 12, muteH = 12;
+    if (sx >= l.px + 10 && sx <= l.px + 10 + muteW && sy >= muteY && sy <= muteY + muteH) {
+        this.audioMuted = !this.audioMuted;
+        if (TWB.Audio.master) TWB.Audio.master.gain.value = this.audioMuted ? 0 : this.audioVolume;
+        return true;
+    }
+
+    var menuBtnY = muteY + muteH + 14;
+    var menuBtnW = l.pw - 20;
+    var menuBtnH = 16;
+    if (sx >= l.px + 10 && sx <= l.px + 10 + menuBtnW && sy >= menuBtnY && sy <= menuBtnY + menuBtnH) {
+        this.settingsOpen = false;
+        window.location.reload();
+        return true;
+    }
+
+    var xSize = 18;
+    var xx = l.px + l.pw - xSize - 6;
+    var xy = l.py + 6;
+    if (sx >= xx && sx <= xx + xSize && sy >= xy && sy <= xy + xSize) {
+        this.settingsOpen = false;
+        return true;
+    }
+
+    return true;
 };
 
 TWB.Game.prototype.drawLighting = function() {
@@ -6054,25 +6496,30 @@ TWB.Game.prototype.tryCraft = function(idx) {
         return;
     }
     this.runStats.itemsCrafted++;
+    TWB.Audio.playSFX('craft', false, 0.5);
     this.notify('Crafted ' + recipe.label + '!');
 };
 
 TWB.Game.prototype.getCraftItemAt = function(sx, sy) {
-    var pw = 280;
-    var ph = 30 + TWB.RECIPES.length * 24 + 10;
+    var cPad = 14, itemH = 32, headerH = 28;
+    var pw = 300;
+    var ph = headerH + cPad + TWB.RECIPES.length * (itemH + 4) + cPad;
     var px = Math.floor((this.canvas.width - pw) / 2);
     var py = Math.floor((this.canvas.height - ph) / 2) - 20;
     for (var i = 0; i < TWB.RECIPES.length; i++) {
-        var ry = py + 28 + i * 24;
-        if (sx >= px + 8 && sx <= px + pw - 8 && sy >= ry && sy <= ry + 20) return i;
+        var ry = py + headerH + cPad + i * (itemH + 4);
+        if (sx >= px + cPad && sx <= px + pw - cPad && sy >= ry && sy <= ry + itemH) return i;
     }
     return -1;
 };
 
 TWB.Game.prototype.drawCrafting = function() {
     var ctx = this.ctx;
-    var pw = 280;
-    var ph = 30 + TWB.RECIPES.length * 24 + 10;
+    var cPad = 14;
+    var itemH = 32;
+    var headerH = 28;
+    var pw = 300;
+    var ph = headerH + cPad + TWB.RECIPES.length * (itemH + 4) + cPad;
     var px = Math.floor((this.canvas.width - pw) / 2);
     var py = Math.floor((this.canvas.height - ph) / 2) - 20;
 
@@ -6082,28 +6529,28 @@ TWB.Game.prototype.drawCrafting = function() {
     ctx.lineWidth = 1;
     ctx.strokeRect(px, py, pw, ph);
 
-    this.drawCloseBtn(px + pw - 20, py + 4);
+    this.drawCloseBtn(px + pw - 24, py + 6);
 
     ctx.font = TWB.FONT_SM;
     ctx.textBaseline = 'top';
     ctx.fillStyle = TWB.CLR_GOLD;
-    ctx.fillText('CRAFTING', px + 10, py + 8);
+    ctx.fillText('CRAFTING', px + cPad, py + 10);
 
     ctx.font = TWB.FONT_SM;
     for (var i = 0; i < TWB.RECIPES.length; i++) {
         var r = TWB.RECIPES[i];
-        var ry = py + 28 + i * 24;
+        var ry = py + headerH + cPad + i * (itemH + 4);
         var can = this.canCraft(r);
 
         ctx.fillStyle = can ? 'rgba(40,60,40,0.6)' : 'rgba(30,30,40,0.4)';
-        ctx.fillRect(px + 8, ry, pw - 16, 20);
+        ctx.fillRect(px + cPad, ry, pw - cPad * 2, itemH);
         if (can) {
             ctx.strokeStyle = '#406040';
-            ctx.strokeRect(px + 8, ry, pw - 16, 20);
+            ctx.strokeRect(px + cPad, ry, pw - cPad * 2, itemH);
         }
 
         ctx.fillStyle = can ? '#c0c0a0' : TWB.CLR_TEXT_DARK;
-        ctx.fillText(r.label, px + 14, ry + 3);
+        ctx.fillText(r.label, px + cPad + 6, ry + 6);
 
         var needs = '';
         for (var j = 0; j < r.needs.length; j++) {
@@ -6113,48 +6560,39 @@ TWB.Game.prototype.drawCrafting = function() {
             needs += (TWB.ITEM_LABELS[r.needs[j][0]] || r.needs[j][0]) + ' ' + have + '/' + need;
         }
         ctx.fillStyle = can ? '#808060' : '#444';
-        ctx.fillText(needs, px + 14, ry + 12);
+        ctx.fillText(needs, px + cPad + 6, ry + 18);
     }
 };
 
 TWB.Game.prototype.drawMenu = function() {
-    if (!this.menu) return;
+    var l = this.getMenuLayout();
+    if (!l) return;
     var ctx = this.ctx;
     var m = this.menu;
-    var menuW = 130;
-    var itemH = 22;
-    var padX = 10;
-    var padY = 6;
-    var menuH = m.items.length * itemH + padY * 2;
-
-    var mx = m.sx;
-    var my = m.sy;
-    if (mx + menuW > this.canvas.width) mx = this.canvas.width - menuW - 4;
-    if (my + menuH > this.canvas.height) my = this.canvas.height - menuH - 4;
 
     ctx.fillStyle = 'rgba(8,8,12,0.92)';
-    ctx.fillRect(mx - 1, my - 1, menuW + 2, menuH + 2);
+    ctx.fillRect(l.mx - 1, l.my - 1, l.menuW + 2, l.menuH + 2);
     ctx.fillStyle = '#14141c';
-    ctx.fillRect(mx, my, menuW, menuH);
+    ctx.fillRect(l.mx, l.my, l.menuW, l.menuH);
     ctx.strokeStyle = TWB.CLR_BORDER;
     ctx.lineWidth = 1;
-    ctx.strokeRect(mx, my, menuW, menuH);
+    ctx.strokeRect(l.mx, l.my, l.menuW, l.menuH);
 
     ctx.font = TWB.FONT_SM;
     ctx.textBaseline = 'middle';
 
     for (var i = 0; i < m.items.length; i++) {
-        var iy = my + padY + i * itemH;
+        var iy = l.my + l.padY + i * l.itemH;
 
         if (i === m.hovered) {
             ctx.fillStyle = 'rgba(212,164,74,0.15)';
-            ctx.fillRect(mx + 2, iy, menuW - 4, itemH);
+            ctx.fillRect(l.mx + 2, iy, l.menuW - 4, l.itemH);
             ctx.fillStyle = TWB.CLR_GOLD;
         } else {
             ctx.fillStyle = TWB.CLR_TEXT_LIGHT;
         }
 
-        ctx.fillText(m.items[i].label, mx + padX, iy + itemH / 2 + 1);
+        ctx.fillText(m.items[i].label, l.mx + l.padX, iy + l.itemH / 2 + 1);
     }
 };
 
@@ -6166,19 +6604,19 @@ TWB.Game.prototype.drawNotification = function() {
 
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.font = TWB.FONT_LG;
+    ctx.font = TWB.FONT_MD;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
     var tx = this.canvas.width / 2;
-    var ty = this.canvas.height * 0.38;
+    var ty = this.canvas.height - Math.floor(this.canvas.height * 0.15) - 30;
 
     var isWarning = n.text === TWB.MSG_TIRED || n.text === TWB.MSG_FULL;
     var color = isWarning ? '#e05050' : TWB.CLR_GOLD;
 
     var tw = ctx.measureText(n.text).width;
     ctx.fillStyle = isWarning ? 'rgba(80,20,20,0.75)' : 'rgba(0,0,0,0.6)';
-    ctx.fillRect(tx - tw / 2 - 10, ty - 12, tw + 20, 26);
+    ctx.fillRect(tx - tw / 2 - 10, ty - 10, tw + 20, 22);
 
     ctx.fillStyle = '#000';
     ctx.fillText(n.text, tx + 1, ty + 1);
@@ -6604,19 +7042,14 @@ TWB.Game.prototype._renderMapStatic = function(ctx, cw, ch) {
     var mapX = ix, mapY = iy, mapW = iw, mapH = ih;
     var sx = mapW / TWB.COLS, sy = mapH / TWB.ROWS;
 
-    ctx.fillStyle = inkL;
-    ctx.strokeStyle = inkL;
-    ctx.lineWidth = 0.5;
+    var ms = TWB.MapSprites;
+    ctx.imageSmoothingEnabled = false;
+    var grassSprites = [ms.grass_tuft_1, ms.grass_tuft_2, ms.grass_tuft_3];
     for (var gi = 0; gi < 350; gi++) {
         var gx = mapX + (TWB.hash(gi * 3, 7700) % Math.floor(mapW));
         var gy = mapY + (TWB.hash(7700, gi * 3) % Math.floor(mapH));
-        var gs = 1.5 + (TWB.hash(gi * 7, 7701) % 3) * 0.5;
-        ctx.beginPath();
-        ctx.moveTo(gx, gy);
-        ctx.lineTo(gx - gs * 0.5, gy - gs);
-        ctx.lineTo(gx + gs * 0.5, gy - gs);
-        ctx.closePath();
-        ctx.fill();
+        var gSpr = grassSprites[gi % 3];
+        if (gSpr) ctx.drawImage(gSpr, gx - 4, gy - 3);
     }
 
     ctx.lineCap = 'round';
@@ -6688,103 +7121,14 @@ TWB.Game.prototype._renderMapStatic = function(ctx, cw, ch) {
         var lake = TWB._lakeData[li];
         var lkx = mapX + lake.cx * sx;
         var lky = mapY + lake.cy * sy;
-        var lkrx = lake.rx * sx * 1.2;
-        var lkry = lake.ry * sy * 1.2;
-        ctx.save();
-        ctx.translate(lkx, lky);
-        ctx.rotate(lake.rot);
-        ctx.beginPath();
-        ctx.ellipse(0, 0, lkrx, lkry, 0, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(100,130,160,0.3)';
-        ctx.fill();
-        ctx.strokeStyle = TWB.CLR_TEXT_MUTED;
-        ctx.lineWidth = 0.8;
-        ctx.stroke();
-        ctx.restore();
-    }
-
-    function drawPine(x, y, s) {
-        var layers = Math.max(3, Math.floor(s * 0.8));
-        var trunkH = s * 0.35;
-        ctx.strokeStyle = '#4a3518';
-        ctx.lineWidth = Math.max(0.8, s * 0.15);
-        ctx.beginPath(); ctx.moveTo(x, y + trunkH); ctx.lineTo(x, y); ctx.stroke();
-
-        for (var li = layers - 1; li >= 0; li--) {
-            var ly = y - li * s * 0.28;
-            var lw = s * 0.2 + (layers - li) * s * 0.22;
-            var droop = s * 0.18;
-            var col = li % 2 === 0 ? TWB.CLR_GREEN_FOREST : TWB.CLR_GREEN_FOREST_DARK;
-            ctx.fillStyle = col;
-            ctx.beginPath();
-            ctx.moveTo(x, ly - s * 0.35);
-            ctx.quadraticCurveTo(x - lw * 0.5, ly - droop * 0.3, x - lw, ly + droop);
-            ctx.quadraticCurveTo(x - lw * 0.3, ly + droop * 0.5, x, ly);
-            ctx.quadraticCurveTo(x + lw * 0.3, ly + droop * 0.5, x + lw, ly + droop);
-            ctx.quadraticCurveTo(x + lw * 0.5, ly - droop * 0.3, x, ly - s * 0.35);
-            ctx.closePath();
-            ctx.fill();
-            ctx.strokeStyle = '#2a4a20';
-            ctx.lineWidth = 0.3;
-            ctx.stroke();
+        if (ms.lake) {
+            var lkrx = lake.rx * sx * 1.2;
+            var lkry = lake.ry * sy * 1.2;
+            var lkw = Math.max(ms.lake.width, lkrx * 2);
+            var lkh = Math.max(ms.lake.height, lkry * 2);
+            ctx.drawImage(ms.lake, Math.floor(lkx - lkw / 2), Math.floor(lky - lkh / 2), Math.floor(lkw), Math.floor(lkh));
         }
     }
-
-    function drawDecid(x, y, s, col1, col2) {
-        var trunkH = s * 0.55;
-        ctx.strokeStyle = TWB.CLR_GOLD_SHADOW;
-        ctx.lineWidth = Math.max(0.8, s * 0.12);
-        ctx.beginPath(); ctx.moveTo(x, y + trunkH); ctx.lineTo(x, y - s * 0.1); ctx.stroke();
-
-        var r = s * 0.5;
-        var lobes = [
-            [x - r * 0.4, y - r * 0.6, r * 0.55],
-            [x + r * 0.45, y - r * 0.5, r * 0.5],
-            [x, y - r * 1.0, r * 0.5],
-            [x - r * 0.15, y - r * 0.3, r * 0.6],
-            [x + r * 0.1, y - r * 0.7, r * 0.45]
-        ];
-        ctx.fillStyle = col1;
-        for (var li = 0; li < lobes.length; li++) {
-            ctx.beginPath();
-            ctx.arc(lobes[li][0], lobes[li][1], lobes[li][2], 0, Math.PI * 2);
-            ctx.fill();
-        }
-        ctx.fillStyle = col2;
-        ctx.beginPath(); ctx.arc(x - r * 0.2, y - r * 0.8, r * 0.35, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.arc(x + r * 0.25, y - r * 0.9, r * 0.3, 0, Math.PI * 2); ctx.fill();
-
-        ctx.strokeStyle = ink;
-        ctx.lineWidth = 0.4;
-        ctx.beginPath();
-        var aStep = Math.PI * 2 / 20;
-        for (var ai = 0; ai <= 20; ai++) {
-            var ang = ai * aStep;
-            var maxR = 0;
-            for (var li = 0; li < lobes.length; li++) {
-                var dist = TWB.dist(x + Math.cos(ang) * r * 1.1, y - r * 0.55 + Math.sin(ang) * r * 0.9, lobes[li][0], lobes[li][1]);
-                if (dist < lobes[li][2] + 0.5) {
-                    var rr = r * 0.85 + Math.sin(ai * 1.7) * r * 0.15;
-                    if (rr > maxR) maxR = rr;
-                }
-            }
-            if (maxR === 0) maxR = r * 0.7 + Math.sin(ai * 2.3) * r * 0.1;
-            var ox2 = x + Math.cos(ang) * maxR;
-            var oy2 = y - r * 0.55 + Math.sin(ang) * maxR * 0.8;
-            if (ai === 0) ctx.moveTo(ox2, oy2);
-            else ctx.lineTo(ox2, oy2);
-        }
-        ctx.stroke();
-    }
-
-    var pineGreens = [TWB.CLR_GREEN_FOREST, TWB.CLR_GREEN_FOREST_DARK, '#456e38', '#325a2a', '#4a7840'];
-    var decidCols = [
-        ['#6a8a40', '#7a9a50'],
-        ['#5a7a35', '#6a8a45'],
-        ['#8a7a30', '#a09040'],
-        ['#7a6a25', '#907a35'],
-        ['#9a6a20', '#b08030']
-    ];
 
     var treeStep = 8;
     for (var tty = 10; tty < TWB.ROWS - 10; tty += treeStep) {
@@ -6804,15 +7148,12 @@ TWB.Game.prototype._renderMapStatic = function(ctx, cw, ch) {
 
             var tmx = mapX + ttx * sx, tmy = mapY + tty * sy;
             var th2 = TWB.hash(ttx * 3, tty * 5);
-            var tSize = 3 + (th2 % 25) * 0.12;
-            var isPine = th2 % 5 < 3;
-
-            if (isPine) {
-                drawPine(tmx, tmy, tSize);
-            } else {
-                var dci = th2 % 5;
-                drawDecid(tmx, tmy, tSize, decidCols[dci][0], decidCols[dci][1]);
-            }
+            var treeType = th2 % 7;
+            var treeSpr;
+            if (treeType < 3) treeSpr = ms.pine_tree;
+            else if (treeType < 6) treeSpr = ms.deciduous_tree;
+            else treeSpr = ms.dead_tree;
+            if (treeSpr) ctx.drawImage(treeSpr, Math.floor(tmx - treeSpr.width / 2), Math.floor(tmy - treeSpr.height));
         }
     }
 
@@ -6822,52 +7163,7 @@ TWB.Game.prototype._renderMapStatic = function(ctx, cw, ch) {
         var boh = TWB.hash(Math.floor(bo.x) * 13, Math.floor(bo.y) * 17);
         var bx = mapX + (bo.x / TWB.TILE) * sx + ((boh % 21) - 10) * sx;
         var by = mapY + (bo.y / TWB.TILE) * sy + (((boh >>> 8) % 21) - 10) * sy;
-        var bSeed = TWB.hash(Math.floor(bo.x), Math.floor(bo.y));
-        var nStones = 3 + bSeed % 3;
-        var bScale = 1.8;
-
-        for (var si = 0; si < nStones; si++) {
-            var sox = bx + (si - nStones / 2) * 4 * bScale + (TWB.hash(si * 7 + Math.floor(bo.x), 5555) % 5 - 2);
-            var soy = by + (TWB.hash(si * 11 + Math.floor(bo.y), 5556) % 4 - 1);
-            var srw = (3 + TWB.hash(si * 13 + Math.floor(bo.x), 5557) % 4) * bScale;
-            var srh = (2.5 + TWB.hash(si * 17 + Math.floor(bo.y), 5558) % 3) * bScale;
-
-            var stoneCol = si % 3 === 0 ? '#6a5a42' : si % 3 === 1 ? '#5a4a38' : '#7a6a50';
-            ctx.fillStyle = stoneCol;
-            ctx.beginPath();
-            ctx.moveTo(sox - srw, soy + srh * 0.2);
-            ctx.quadraticCurveTo(sox - srw * 0.8, soy - srh, sox, soy - srh);
-            ctx.quadraticCurveTo(sox + srw * 0.8, soy - srh, sox + srw, soy + srh * 0.2);
-            ctx.quadraticCurveTo(sox + srw * 0.5, soy + srh * 0.6, sox, soy + srh * 0.5);
-            ctx.quadraticCurveTo(sox - srw * 0.5, soy + srh * 0.6, sox - srw, soy + srh * 0.2);
-            ctx.closePath();
-            ctx.fill();
-
-            ctx.strokeStyle = ink;
-            ctx.lineWidth = 0.6;
-            ctx.stroke();
-
-            ctx.fillStyle = 'rgba(160,150,120,0.35)';
-            ctx.beginPath();
-            ctx.moveTo(sox - srw * 0.5, soy - srh * 0.7);
-            ctx.quadraticCurveTo(sox - srw * 0.2, soy - srh * 0.9, sox + srw * 0.1, soy - srh * 0.6);
-            ctx.quadraticCurveTo(sox - srw * 0.1, soy - srh * 0.3, sox - srw * 0.5, soy - srh * 0.4);
-            ctx.closePath();
-            ctx.fill();
-
-            ctx.strokeStyle = 'rgba(50,40,20,0.3)';
-            ctx.lineWidth = 0.3;
-            ctx.beginPath();
-            ctx.moveTo(sox - srw * 0.3, soy - srh * 0.2);
-            ctx.lineTo(sox + srw * 0.1, soy + srh * 0.1);
-            ctx.stroke();
-            if (si % 2 === 0) {
-                ctx.beginPath();
-                ctx.moveTo(sox + srw * 0.2, soy - srh * 0.5);
-                ctx.lineTo(sox + srw * 0.4, soy - srh * 0.1);
-                ctx.stroke();
-            }
-        }
+        if (ms.boulder_cluster) ctx.drawImage(ms.boulder_cluster, Math.floor(bx - 6), Math.floor(by - 4));
     }
 
     for (var cri = 0; cri < this.objects.length; cri++) {
@@ -6876,15 +7172,7 @@ TWB.Game.prototype._renderMapStatic = function(ctx, cw, ch) {
         var crh2 = TWB.hash(Math.floor(crn.x) * 13, Math.floor(crn.y) * 17);
         var crx2 = mapX + (crn.x / TWB.TILE) * sx + ((crh2 % 21) - 10) * sx;
         var cry2 = mapY + (crn.y / TWB.TILE) * sy + (((crh2 >>> 8) % 21) - 10) * sy;
-        ctx.fillStyle = '#706050';
-        ctx.beginPath(); ctx.ellipse(crx2, cry2 + 1, 2.5, 1.5, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#807060';
-        ctx.beginPath(); ctx.ellipse(crx2, cry2 - 0.5, 2, 1.2, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#908070';
-        ctx.beginPath(); ctx.ellipse(crx2, cry2 - 1.8, 1.2, 0.8, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = ink;
-        ctx.lineWidth = 0.3;
-        ctx.beginPath(); ctx.ellipse(crx2, cry2 + 1, 2.5, 1.5, 0, 0, Math.PI * 2); ctx.stroke();
+        if (ms.cairn) ctx.drawImage(ms.cairn, Math.floor(crx2 - 4), Math.floor(cry2 - 5));
     }
 
     for (var sri = 0; sri < this.objects.length; sri++) {
@@ -6893,14 +7181,7 @@ TWB.Game.prototype._renderMapStatic = function(ctx, cw, ch) {
         var srh2 = TWB.hash(Math.floor(sro.x) * 13, Math.floor(sro.y) * 17);
         var srx2 = mapX + (sro.x / TWB.TILE) * sx + ((srh2 % 21) - 10) * sx;
         var sry2 = mapY + (sro.y / TWB.TILE) * sy + (((srh2 >>> 8) % 21) - 10) * sy;
-        ctx.fillStyle = TWB.CLR_BROWN_MED;
-        ctx.fillRect(srx2 - 1.5, sry2 - 5, 3, 6);
-        ctx.fillRect(srx2 - 3, sry2 - 5, 6, 1.5);
-        ctx.strokeStyle = ink;
-        ctx.lineWidth = 0.4;
-        ctx.strokeRect(srx2 - 1.5, sry2 - 5, 3, 6);
-        ctx.fillStyle = '#8a7a58';
-        ctx.fillRect(srx2 - 0.5, sry2 - 3.5, 1, 2);
+        if (ms.shrine_cross) ctx.drawImage(ms.shrine_cross, Math.floor(srx2 - 4), Math.floor(sry2 - 10));
     }
 
     for (var fmi = 0; fmi < this.objects.length; fmi++) {
@@ -6908,13 +7189,7 @@ TWB.Game.prototype._renderMapStatic = function(ctx, cw, ch) {
         if (fmo.type !== 'fountain') continue;
         var fmx = mapX + (fmo.x / TWB.TILE) * sx;
         var fmy = mapY + (fmo.y / TWB.TILE) * sy;
-        ctx.fillStyle = '#706860';
-        ctx.fillRect(fmx - 2, fmy - 2, 4, 4);
-        ctx.fillStyle = '#506878';
-        ctx.fillRect(fmx + 1, fmy - 1, 2, 3);
-        ctx.strokeStyle = ink;
-        ctx.lineWidth = 0.3;
-        ctx.strokeRect(fmx - 2, fmy - 2, 4, 4);
+        if (ms.well) ctx.drawImage(ms.well, Math.floor(fmx - 5), Math.floor(fmy - 5));
     }
 
     for (var bmi = 0; bmi < this.objects.length; bmi++) {
@@ -6923,35 +7198,8 @@ TWB.Game.prototype._renderMapStatic = function(ctx, cw, ch) {
         var bmh = TWB.hash(Math.floor(bmo.x) * 13, Math.floor(bmo.y) * 17);
         var bmx = mapX + (bmo.x / TWB.TILE) * sx + ((bmh % 15) - 7) * sx;
         var bmy = mapY + (bmo.y / TWB.TILE) * sy + (((bmh >>> 8) % 15) - 7) * sy;
-        if (bmo.type === 'bridge') {
-            ctx.strokeStyle = TWB.CLR_BROWN_DEEP;
-            ctx.lineWidth = 0.8;
-            ctx.beginPath(); ctx.moveTo(bmx - 6, bmy - 2.5); ctx.lineTo(bmx + 6, bmy - 2.5); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(bmx - 6, bmy + 2.5); ctx.lineTo(bmx + 6, bmy + 2.5); ctx.stroke();
-            ctx.fillStyle = TWB.CLR_BROWN_DARK;
-            ctx.strokeStyle = TWB.CLR_GOLD_SHADOW;
-            ctx.lineWidth = 0.4;
-            for (var pl = 0; pl < 5; pl++) {
-                var plx = bmx - 5 + pl * 2.5;
-                ctx.fillRect(plx, bmy - 2, 2, 4);
-                ctx.strokeRect(plx, bmy - 2, 2, 4);
-            }
-        } else if (bmo.type === 'broken_bridge') {
-            ctx.fillStyle = '#7a5030';
-            ctx.fillRect(bmx - 6, bmy - 2, 4, 4);
-            ctx.fillRect(bmx + 2, bmy - 2, 4, 4);
-            ctx.strokeStyle = red;
-            ctx.lineWidth = 0.5;
-            ctx.strokeRect(bmx - 6, bmy - 2, 4, 4);
-            ctx.strokeRect(bmx + 2, bmy - 2, 4, 4);
-        } else {
-            ctx.fillStyle = '#7a7060';
-            for (var bsi = 0; bsi < 4; bsi++) {
-                ctx.beginPath();
-                ctx.ellipse(bmx - 3 + bsi * 2.5, bmy, 1.2, 0.8, 0, 0, Math.PI * 2);
-                ctx.fill();
-            }
-        }
+        var bSpr = bmo.type === 'bridge' ? ms.bridge : bmo.type === 'broken_bridge' ? ms.broken_bridge : ms.stepping_stones;
+        if (bSpr) ctx.drawImage(bSpr, Math.floor(bmx - bSpr.width / 2), Math.floor(bmy - bSpr.height / 2));
     }
 
     for (var ci3 = 0; ci3 < TWB._cabinData.length; ci3++) {
@@ -6959,57 +7207,8 @@ TWB.Game.prototype._renderMapStatic = function(ctx, cw, ch) {
         var ch1 = TWB.hash(ci3 * 37, 7777);
         var coffX = ((ch1 % 31) - 15) * sx;
         var coffY = (((ch1 >>> 8) % 31) - 15) * sy;
-        var cx = mapX + c.cx * sx + coffX, cy = mapY + c.cy * sy + coffY;
-        var cStyle = ch1 % 3;
-
-        var wallW = 9, wallH = 6;
-        var wallCol = cStyle === 0 ? TWB.CLR_BROWN : cStyle === 1 ? '#7a6545' : '#6a5535';
-        ctx.fillStyle = wallCol;
-        ctx.fillRect(cx - wallW / 2, cy - 1, wallW, wallH);
-
-        ctx.strokeStyle = 'rgba(60,40,20,0.3)';
-        ctx.lineWidth = 0.3;
-        for (var wp = 0; wp < 4; wp++) {
-            var wpx = cx - wallW / 2 + 1 + wp * 2.2;
-            ctx.beginPath(); ctx.moveTo(wpx, cy - 1); ctx.lineTo(wpx, cy + wallH - 1); ctx.stroke();
-        }
-
-        ctx.strokeStyle = ink;
-        ctx.lineWidth = 0.5;
-        ctx.strokeRect(cx - wallW / 2, cy - 1, wallW, wallH);
-
-        var roofCol = cStyle === 0 ? '#9a5535' : cStyle === 1 ? '#8a6a3a' : '#7a5530';
-        ctx.fillStyle = roofCol;
-        ctx.beginPath();
-        ctx.moveTo(cx - wallW / 2 - 2, cy - 1);
-        ctx.lineTo(cx, cy - 7);
-        ctx.lineTo(cx + wallW / 2 + 2, cy - 1);
-        ctx.closePath();
-        ctx.fill();
-        ctx.strokeStyle = ink;
-        ctx.lineWidth = 0.5;
-        ctx.stroke();
-
-        ctx.strokeStyle = 'rgba(60,40,20,0.25)';
-        ctx.lineWidth = 0.3;
-        for (var rl = 0; rl < 3; rl++) {
-            var rly = cy - 2 - rl * 1.5;
-            var rlw = (wallW / 2 + 2) * (1 - (rl + 1) * 0.25);
-            ctx.beginPath(); ctx.moveTo(cx - rlw, rly); ctx.lineTo(cx + rlw, rly); ctx.stroke();
-        }
-
-        ctx.fillStyle = '#2a1a0a';
-        ctx.fillRect(cx - 1, cy + wallH - 4, 2.5, 3);
-
-        if (cStyle !== 2) {
-            ctx.fillStyle = '#c8d8e0';
-            ctx.fillRect(cx + 2.5, cy, 2, 2);
-            ctx.strokeStyle = ink;
-            ctx.lineWidth = 0.3;
-            ctx.strokeRect(cx + 2.5, cy, 2, 2);
-            ctx.beginPath(); ctx.moveTo(cx + 3.5, cy); ctx.lineTo(cx + 3.5, cy + 2); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(cx + 2.5, cy + 1); ctx.lineTo(cx + 4.5, cy + 1); ctx.stroke();
-        }
+        var cx2 = mapX + c.cx * sx + coffX, cy2 = mapY + c.cy * sy + coffY;
+        if (ms.cabin) ctx.drawImage(ms.cabin, Math.floor(cx2 - ms.cabin.width / 2), Math.floor(cy2 - ms.cabin.height / 2));
     }
 
     var sc = TWB._cabinData[TWB._startCabin];
@@ -7018,22 +7217,14 @@ TWB.Game.prototype._renderMapStatic = function(ctx, cw, ch) {
     var scOffY = (((sch >>> 8) % 31) - 15) * sy;
     var scx = mapX + sc.cx * sx + scOffX, scy = mapY + sc.cy * sy + scOffY;
     ctx.save();
-    ctx.translate(scx, scy - 16);
+    ctx.translate(scx, scy - 18);
     ctx.rotate(-0.04);
     ctx.font = 'italic 8px Georgia, "Times New Roman", serif';
     ctx.textAlign = 'center';
     ctx.fillStyle = ink;
     ctx.fillText('You are here', 0, 0);
     ctx.restore();
-
-    ctx.fillStyle = ink;
-    ctx.beginPath();
-    ctx.arc(scx, scy - 10, 2.5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#c8a860';
-    ctx.beginPath();
-    ctx.arc(scx, scy - 10, 1.5, 0, Math.PI * 2);
-    ctx.fill();
+    if (ms.player_marker) ctx.drawImage(ms.player_marker, Math.floor(scx - ms.player_marker.width / 2), Math.floor(scy - ms.player_marker.height));
 
     if (TWB._targetCabin >= 0) {
         var tc = TWB._cabinData[TWB._targetCabin];
@@ -7041,83 +7232,13 @@ TWB.Game.prototype._renderMapStatic = function(ctx, cw, ch) {
         var tcOffX = ((tch % 31) - 15) * sx;
         var tcOffY = (((tch >>> 8) % 31) - 15) * sy;
         var tcx = mapX + tc.cx * sx + tcOffX, tcy = mapY + tc.cy * sy + tcOffY;
-        ctx.strokeStyle = red;
-        ctx.lineWidth = 1.5;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.beginPath();
-        var nPts = 32;
-        for (var pi = 0; pi <= nPts; pi++) {
-            var ang = (pi / nPts) * Math.PI * 2 - 0.3;
-            var wobble = Math.sin(pi * 1.7) * 2 + Math.cos(pi * 2.9) * 1.4;
-            var rr2 = 12 + wobble;
-            var ptx = tcx + Math.cos(ang) * rr2;
-            var pty = tcy + Math.sin(ang) * rr2;
-            if (pi === 0) ctx.moveTo(ptx, pty);
-            else ctx.lineTo(ptx, pty);
-        }
-        ctx.stroke();
+        if (ms.x_marker) ctx.drawImage(ms.x_marker, Math.floor(tcx - ms.x_marker.width / 2), Math.floor(tcy - ms.x_marker.height - 8));
     }
 
-    var crx = mapX + mapW - 42, cry3 = mapY + mapH - 42, crs = 20;
-    ctx.fillStyle = 'rgba(226,212,176,0.8)';
-    ctx.beginPath(); ctx.arc(crx, cry3, crs + 8, 0, Math.PI * 2); ctx.fill();
-
-    ctx.strokeStyle = ink;
-    ctx.lineWidth = 1.2;
-    ctx.beginPath(); ctx.arc(crx, cry3, crs + 3, 0, Math.PI * 2); ctx.stroke();
-    ctx.lineWidth = 0.6;
-    ctx.beginPath(); ctx.arc(crx, cry3, crs + 5, 0, Math.PI * 2); ctx.stroke();
-
-    ctx.fillStyle = ink;
-    ctx.beginPath(); ctx.arc(crx, cry3, 2, 0, Math.PI * 2); ctx.fill();
-
-    var mainA = [-Math.PI / 2, 0, Math.PI / 2, Math.PI];
-    for (var i = 0; i < 4; i++) {
-        var a = mainA[i];
-        var len = crs + 1;
-        ctx.fillStyle = ink;
-        ctx.beginPath();
-        ctx.moveTo(crx + Math.cos(a) * len, cry3 + Math.sin(a) * len);
-        ctx.lineTo(crx + Math.cos(a - 0.22) * 3, cry3 + Math.sin(a - 0.22) * 3);
-        ctx.lineTo(crx, cry3);
-        ctx.closePath();
-        ctx.fill();
-        ctx.fillStyle = inkL;
-        ctx.beginPath();
-        ctx.moveTo(crx + Math.cos(a) * len, cry3 + Math.sin(a) * len);
-        ctx.lineTo(crx + Math.cos(a + 0.22) * 3, cry3 + Math.sin(a + 0.22) * 3);
-        ctx.lineTo(crx, cry3);
-        ctx.closePath();
-        ctx.fill();
+    if (ms.compass_rose) {
+        var crx = mapX + mapW - 26, cry3 = mapY + mapH - 26;
+        ctx.drawImage(ms.compass_rose, Math.floor(crx - ms.compass_rose.width / 2), Math.floor(cry3 - ms.compass_rose.height / 2));
     }
-    var secA = [-Math.PI / 4, Math.PI / 4, 3 * Math.PI / 4, -3 * Math.PI / 4];
-    for (var i = 0; i < 4; i++) {
-        var a = secA[i];
-        ctx.fillStyle = inkL;
-        ctx.beginPath();
-        ctx.moveTo(crx + Math.cos(a) * crs * 0.5, cry3 + Math.sin(a) * crs * 0.5);
-        ctx.lineTo(crx + Math.cos(a - 0.3) * 2, cry3 + Math.sin(a - 0.3) * 2);
-        ctx.lineTo(crx + Math.cos(a + 0.3) * 2, cry3 + Math.sin(a + 0.3) * 2);
-        ctx.closePath();
-        ctx.fill();
-    }
-
-    ctx.font = 'bold 8px Georgia, serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = ink;
-    ctx.fillText('N', crx, cry3 - crs - 8);
-    ctx.font = '7px Georgia, serif';
-    ctx.fillText('S', crx, cry3 + crs + 8);
-    ctx.fillText('E', crx + crs + 8, cry3);
-    ctx.fillText('W', crx - crs - 8, cry3);
-    ctx.textBaseline = 'alphabetic';
-
-    ctx.font = 'bold 10px Georgia, "Times New Roman", serif';
-    ctx.textAlign = 'center';
-    ctx.fillStyle = ink;
-    ctx.fillText('THE WAY BACK', cw / 2, pad - 4);
 
     ctx.font = TWB.FONT_XS;
     ctx.fillStyle = inkL;
@@ -7185,16 +7306,16 @@ TWB.Game.prototype.drawBackpack = function() {
             ctx.font = TWB.FONT_XS;
             var words = label.split(' ');
             if (words.length > 1) {
-                ctx.fillText(words[0], bx + l.slotSize / 2, by + 28);
-                ctx.fillText(words.slice(1).join(' '), bx + l.slotSize / 2, by + 38);
+                ctx.fillText(words[0], bx + l.slotSize / 2, by + l.slotSize - 24);
+                ctx.fillText(words.slice(1).join(' '), bx + l.slotSize / 2, by + l.slotSize - 14);
             } else {
-                ctx.fillText(label, bx + l.slotSize / 2, by + 33);
+                ctx.fillText(label, bx + l.slotSize / 2, by + l.slotSize - 18);
             }
             ctx.restore();
         } else {
             ctx.font = TWB.FONT_SM;
             ctx.fillStyle = '#222230';
-            ctx.fillText('Empty', bx + l.slotSize / 2, by + 22);
+            ctx.fillText('Empty', bx + l.slotSize / 2, by + Math.floor(l.slotSize / 2) - 4);
         }
     }
 
@@ -7219,20 +7340,32 @@ TWB.Game.prototype.drawBackpack = function() {
                           dropall: [TWB.CLR_RED_BG_BLACK, TWB.CLR_RED_BG_DARK, TWB.CLR_RED_MED, TWB.CLR_RED_LIGHT] };
 
         ctx.font = TWB.FONT_SM;
+        var btnWidths = [];
+        for (var bm = 0; bm < btns.length; bm++) {
+            var tw = ctx.measureText(btnLabels[btns[bm]]).width + 16;
+            btnWidths.push(Math.max(btnW, tw));
+        }
         for (var bi = 0; bi < btns.length; bi++) {
             var col = bi % 2;
             var row = Math.floor(bi / 2);
-            var bx = startX + col * (btnW + gapX);
+            var colW = btnWidths[col === 0 ? (bi) : (bi)] || btnW;
+            var rowStart = Math.floor(bi / 2) * 2;
+            var w0 = btnWidths[rowStart] || btnW;
+            var w1 = btnWidths[rowStart + 1] || btnW;
+            var rowTotalW = w0 + gapX + w1;
+            var rowStartX = l.px + Math.floor((l.pw - rowTotalW) / 2);
+            var bx = col === 0 ? rowStartX : rowStartX + w0 + gapX;
+            var curBtnW = btnWidths[bi];
             var by = baseY + row * (btnH + gapY);
             var hovered = this.backpackBtnHover === btns[bi];
             var c = btnColors[btns[bi]] || ['#1a2a1a', '#2a3a2a', TWB.CLR_GREEN_MUTED, TWB.CLR_GREEN_PALE];
             ctx.fillStyle = hovered ? c[1] : c[0];
-            ctx.fillRect(bx, by, btnW, btnH);
+            ctx.fillRect(bx, by, curBtnW, btnH);
             ctx.strokeStyle = c[2];
             ctx.lineWidth = 1;
-            ctx.strokeRect(bx, by, btnW, btnH);
+            ctx.strokeRect(bx, by, curBtnW, btnH);
             ctx.fillStyle = hovered ? c[3] : c[2];
-            ctx.fillText(btnLabels[btns[bi]], bx + btnW / 2, by + 6);
+            ctx.fillText(btnLabels[btns[bi]], bx + curBtnW / 2, by + 6);
         }
     }
 
@@ -7373,15 +7506,17 @@ TWB.Game.prototype.drawWindowView = function() {
     ctx.fillRect(vx - outerW - 1, vy - outerW - 1, vw + outerW * 2 + 2, vh + outerW * 2 + 2);
 
     var imgKey;
-    if (wv.nearRiver) {
-        if (isNight) imgKey = 'w-view-river-2';
-        else if (isDusk || isDawn) imgKey = 'w-view-river-1';
-        else imgKey = 'w-view-river-2';
-    } else {
-        if (isNight) imgKey = 'w-view-mountain-night-1';
-        else if (isDusk || isDawn) imgKey = 'w-view-mountain-day-1';
-        else imgKey = 'w-view-mountain-day-2';
+    var pick = function(arr) { return arr[Math.floor(Math.random() * arr.length)]; };
+    if (!wv._imgKey) {
+        if (wv.nearRiver) {
+            if (isNight) wv._imgKey = 'w-view-river-2';
+            else wv._imgKey = pick(['w-view-river-1', 'w-view-river-2']);
+        } else {
+            if (isNight) wv._imgKey = pick(['w-view-mountain-night-1', 'w-view-mountain-night-3', 'w-view-mountain-night-4']);
+            else wv._imgKey = pick(['w-view-mountain-day-1', 'w-view-mountain-day-2', 'w-view-mountain-day-3', 'w-view-mountain-day-4']);
+        }
     }
+    imgKey = wv._imgKey;
 
     var img = TWB.WindowViews[imgKey];
     if (img) {
@@ -7525,8 +7660,19 @@ TWB.Game.prototype.drawNote = function() {
     ctx.fillStyle = 'rgba(0,0,0,0.75)';
     ctx.fillRect(0, 0, cw, ch);
 
-    var pw = 380;
-    var ph = 200;
+    ctx.font = TWB.FONT_MD;
+    var lines = this.readingNote.split('\n');
+    var maxLineW = 0;
+    for (var m = 0; m < lines.length; m++) {
+        var lw = ctx.measureText(lines[m]).width;
+        if (lw > maxLineW) maxLineW = lw;
+    }
+    var lineH = 22;
+    var padX = 30;
+    var padTop = 40;
+    var padBot = 40;
+    var pw = Math.min(cw - 20, Math.max(200, maxLineW + padX * 2));
+    var ph = padTop + lines.length * lineH + padBot;
     var px = Math.floor((cw - pw) / 2);
     var py = Math.floor((ch - ph) / 2) - 20;
 
@@ -7543,10 +7689,9 @@ TWB.Game.prototype.drawNote = function() {
     ctx.fillStyle = '#a09880';
     ctx.textAlign = 'center';
 
-    var lines = this.readingNote.split('\n');
-    var startY = py + 40 + Math.floor((ph - 80 - lines.length * 22) / 2);
+    var startY = py + padTop;
     for (var i = 0; i < lines.length; i++) {
-        ctx.fillText(lines[i], Math.floor(cw / 2), startY + i * 22);
+        ctx.fillText(lines[i], Math.floor(cw / 2), startY + i * lineH);
     }
 
     ctx.font = TWB.FONT_SM;
@@ -7599,8 +7744,8 @@ TWB.Game.prototype.drawEndScreen = function(opts) {
         var cabCount = Object.keys(rs.cabinsVisited).length;
         var dist = Math.round(rs.distWalked * 10);
         var distStr = dist >= 1000 ? (dist / 1000).toFixed(1) + ' km' : dist + ' m';
-        var lCol = w / 2 - 160;
-        var rCol = w / 2 + 20;
+        var lCol = w / 2 - 180;
+        var rCol = w / 2 + 60;
         var sy = h / 2 - 40;
         var lh = 16;
         ctx.textAlign = 'left';
@@ -7763,81 +7908,180 @@ TWB.Game.prototype.handleFatesAnswer = function(choice) {
 
 TWB.Game.prototype.drawFates = function() {
     var ctx = this.ctx;
-    var w = this.canvas.width;
-    var h = this.canvas.height;
+    var cw = this.canvas.width;
+    var ch = this.canvas.height;
     var f = this.fates;
-    var t = f.fade;
 
-    ctx.save();
-    ctx.globalAlpha = t * 0.65;
-    ctx.fillStyle = TWB.CLR_PURPLE_BG_DARK;
-    ctx.fillRect(0, 0, w, h);
+    if (!f.img) return;
 
-    ctx.globalAlpha = t;
-
-    var sprite = TWB.Sprites.fates;
-    if (sprite) {
-        var spx = w / 2 - sprite.width / 2;
-        var spy = h / 2 - 140;
-        ctx.globalAlpha = t * t;
-        ctx.drawImage(sprite, Math.floor(spx), Math.floor(spy));
-        ctx.globalAlpha = t;
+    if (!f.crt) {
+        var scale = 1.08;
+        var oc = document.createElement('canvas');
+        oc.width = Math.ceil(cw * scale); oc.height = Math.ceil(ch * scale);
+        var octx = oc.getContext('2d');
+        octx.imageSmoothingEnabled = false;
+        octx.fillStyle = '#0a0010';
+        octx.fillRect(0, 0, oc.width, oc.height);
+        var img = f.img;
+        var imgRatio = img.width / img.height;
+        var canvasRatio = oc.width / oc.height;
+        var dw, dh, dx, dy;
+        if (imgRatio > canvasRatio) {
+            dh = oc.height; dw = oc.height * imgRatio; dx = (oc.width - dw) / 2; dy = 0;
+        } else {
+            dw = oc.width; dh = oc.width / imgRatio; dx = 0; dy = (oc.height - dh) / 2;
+        }
+        octx.drawImage(img, dx, dy, dw, dh);
+        var panDir = Math.random() * Math.PI * 2;
+        f.crt = { imgCanvas: oc, startTime: Date.now(), panDx: Math.cos(panDir), panDy: Math.sin(panDir) };
     }
 
-    var fw = 340, fh = 220;
-    var fx = (w - fw) / 2;
-    var fy = (h - fh) / 2;
+    var c = f.crt;
+    var elapsed = (Date.now() - c.startTime) / 1000;
+    var duration = 3;
+    var progress = Math.min(1, elapsed / duration);
+    var panSpeed = 2;
+    var panX = c.panDx * elapsed * panSpeed;
+    var panY = c.panDy * elapsed * panSpeed;
+    var maxPan = (c.imgCanvas.width - cw) / 2;
+    panX = Math.max(-maxPan, Math.min(maxPan, panX));
+    panY = Math.max(-maxPan, Math.min(maxPan, panY));
+    var drawX = -(c.imgCanvas.width - cw) / 2 + panX;
+    var drawY = -(c.imgCanvas.height - ch) / 2 + panY;
 
-    ctx.fillStyle = 'rgba(10,0,20,' + (0.88 * t) + ')';
-    ctx.strokeStyle = 'rgba(74,48,96,' + t + ')';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.rect(fx, fy, fw, fh);
-    ctx.fill();
-    ctx.stroke();
+    ctx.fillStyle = '#0a0010';
+    ctx.fillRect(0, 0, cw, ch);
 
-    ctx.fillStyle = '#8a6aaa';
-    ctx.font = TWB.FONT_LG;
-    ctx.textAlign = 'center';
-    ctx.fillText('The three women speak:', fx + fw / 2, fy + 28);
-
-    ctx.fillStyle = '#c8b8e0';
-    ctx.font = TWB.FONT_SM;
-    var lines = f.question.q.split('\n');
-    for (var li = 0; li < lines.length; li++) {
-        ctx.fillText(lines[li], fx + fw / 2, fy + 58 + li * 18);
+    var scanY = Math.floor(progress * ch);
+    if (scanY > 0) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, 0, cw, scanY);
+        ctx.clip();
+        ctx.drawImage(c.imgCanvas, drawX, drawY);
+        ctx.restore();
     }
 
-    if (t >= 1) {
-        var btnW = 140, btnH = 30;
-        var btnY = fy + fh - 52;
-        var btn1x = fx + fw / 2 - btnW - 10;
-        var btn2x = fx + fw / 2 + 10;
+    if (progress < 1) {
+        var staticH = Math.min(40, ch - scanY);
+        if (staticH > 0) {
+            var sd = ctx.getImageData(0, scanY, cw, staticH);
+            var px = sd.data;
+            for (var i = 0; i < px.length; i += 4) {
+                var v = Math.floor(Math.random() * 40);
+                px[i] = v; px[i+1] = 0; px[i+2] = v + 10; px[i+3] = 255;
+            }
+            ctx.putImageData(sd, 0, scanY);
+        }
+    }
 
-        ctx.fillStyle = f.hovered === 0 ? TWB.CLR_PURPLE_DARK : TWB.CLR_PURPLE_BG;
+    if (scanY > 0) {
+        ctx.save();
+        ctx.globalAlpha = 0.06;
+        ctx.fillStyle = '#000';
+        for (var ly = 0; ly < scanY; ly += 4) {
+            ctx.fillRect(0, ly, cw, 2);
+        }
+        ctx.restore();
+    }
+
+    if (progress < 1) {
+        var flicker = 0.92 + Math.random() * 0.08;
+        ctx.save();
+        ctx.globalAlpha = 1 - flicker;
+        ctx.fillStyle = '#0a0010';
+        ctx.fillRect(0, 0, cw, scanY);
+        ctx.restore();
+    }
+
+    if (scanY > 2) {
+        ctx.save();
+        ctx.globalAlpha = 0.15;
+        ctx.fillStyle = '#84a';
+        ctx.fillRect(0, Math.max(0, scanY - 2), cw, 2);
+        ctx.restore();
+    }
+
+    if (progress >= 1) {
+        var cAlpha = Math.min(1, (elapsed - duration) * 2);
+        ctx.save();
+        ctx.globalAlpha = cAlpha;
+
+        ctx.font = TWB.FONT_SM;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        var titleMsg = 'The three women speak:';
+        var lines = f.question.q.split('\n');
+        var lineH = 16;
+        var pad = 14;
+
+        var maxW = ctx.measureText(titleMsg).width;
+        for (var mi = 0; mi < lines.length; mi++) {
+            var lw = ctx.measureText(lines[mi]).width;
+            if (lw > maxW) maxW = lw;
+        }
+        var boxW = maxW + pad * 2;
+        var boxH = 24 + lines.length * lineH + pad;
+        var boxX = cw / 2 - boxW / 2;
+        var boxY = ch * 0.58 - 16;
+
+        ctx.fillStyle = 'rgba(10,0,20,0.75)';
+        ctx.fillRect(boxX, boxY, boxW, boxH);
+        ctx.strokeStyle = 'rgba(74,48,96,0.5)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(boxX, boxY, boxW, boxH);
+
+        ctx.fillStyle = '#8a6aaa';
+        ctx.fillText(titleMsg, cw / 2, boxY + 16);
+
+        ctx.fillStyle = '#c8b8e0';
+        for (var li = 0; li < lines.length; li++) {
+            ctx.fillText(lines[li], cw / 2, boxY + 34 + li * lineH);
+        }
+        ctx.restore();
+    }
+
+    if (progress >= 1 && elapsed > duration + 0.5) {
+        var btnAlpha = Math.min(1, (elapsed - duration - 0.5) * 2);
+        var btnW = 140, btnH = 28, btnGap = 20;
+        var btnY = ch * 0.78 + 34;
+        var btn1x = cw / 2 - btnW - btnGap / 2;
+        var btn2x = cw / 2 + btnGap / 2;
+
+        ctx.save();
+        ctx.globalAlpha = btnAlpha;
+        ctx.font = TWB.FONT_SM;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        ctx.fillStyle = f.hovered === 0 ? 'rgba(40,20,60,0.9)' : 'rgba(10,0,20,0.75)';
+        ctx.strokeStyle = f.hovered === 0 ? '#c8b8e0' : '#8a6aaa';
+        ctx.lineWidth = f.hovered === 0 ? 2 : 1;
         ctx.fillRect(btn1x, btnY, btnW, btnH);
-        ctx.strokeStyle = TWB.CLR_PURPLE;
         ctx.strokeRect(btn1x, btnY, btnW, btnH);
+        ctx.fillStyle = f.hovered === 0 ? '#e0d0ff' : '#c8b8e0';
+        ctx.fillText(f.question.a[0], btn1x + btnW / 2, btnY + btnH / 2);
 
-        ctx.fillStyle = f.hovered === 1 ? TWB.CLR_PURPLE_DARK : TWB.CLR_PURPLE_BG;
+        ctx.fillStyle = f.hovered === 1 ? 'rgba(40,20,60,0.9)' : 'rgba(10,0,20,0.75)';
+        ctx.strokeStyle = f.hovered === 1 ? '#c8b8e0' : '#8a6aaa';
+        ctx.lineWidth = f.hovered === 1 ? 2 : 1;
         ctx.fillRect(btn2x, btnY, btnW, btnH);
-        ctx.strokeStyle = TWB.CLR_PURPLE;
         ctx.strokeRect(btn2x, btnY, btnW, btnH);
+        ctx.fillStyle = f.hovered === 1 ? '#e0d0ff' : '#c8b8e0';
+        ctx.fillText(f.question.a[1], btn2x + btnW / 2, btnY + btnH / 2);
 
-        ctx.fillStyle = '#d0c0f0';
-        ctx.font = TWB.FONT_XS;
-        ctx.fillText(f.question.a[0], btn1x + btnW / 2, btnY + 18);
-        ctx.fillText(f.question.a[1], btn2x + btnW / 2, btnY + 18);
+        ctx.restore();
     }
-
-    ctx.restore();
 };
 
 TWB.Game.prototype.drawHUD = function() {
     var ctx = this.ctx;
     var w = this.canvas.width;
-    var hudH = 80;
-    var hudY = this.canvas.height - hudH;
+    var h = this.canvas.height;
+    var hudH = Math.floor(h * 0.15);
+    var hudY = h - hudH;
+    var pad = Math.floor(hudH * 0.1);
 
     ctx.fillStyle = 'rgba(6,6,10,0.88)';
     ctx.fillRect(0, hudY, w, hudH);
@@ -7848,138 +8092,147 @@ TWB.Game.prototype.drawHUD = function() {
 
     var s = this.stats;
     var ws = this.wolfStats;
-
     ctx.font = TWB.FONT_SM;
     ctx.textBaseline = 'top';
 
+    var showBp = window.innerWidth >= 1000;
+    var sec1W, sec2W, sec3W;
+    if (showBp) {
+        sec1W = Math.floor(w * 0.30);
+        sec2W = Math.floor(w * 0.40);
+        sec3W = w - sec1W - sec2W;
+    } else {
+        sec1W = Math.floor(w * 0.50);
+        sec2W = 0;
+        sec3W = w - sec1W;
+    }
+    var sep1 = sec1W;
+    var sep2 = sec1W + sec2W;
+
+    var faceSize = hudH - pad * 2;
     var faceH = TWB.Resources.face_human;
     if (faceH) {
-        var fhH = Math.floor(faceH.height * (60 / faceH.width));
-        ctx.drawImage(faceH, 4, hudY + 10, 60, fhH);
+        var fhH = Math.floor(faceH.height * (faceSize / faceH.width));
+        ctx.drawImage(faceH, pad, hudY + pad, faceSize, fhH);
     }
-    var px = 68;
-    ctx.fillStyle = TWB.CLR_GOLD;
-    ctx.fillText(this.playerName || 'PLAYER', px, hudY + 5);
-    this.drawBar(ctx, px, hudY + 17, 70, 6, s.health, TWB.CLR_RED_BG_DEEP, TWB.CLR_RED_DEEP);
-    this.drawBar(ctx, px, hudY + 27, 70, 6, s.energy, TWB.CLR_GREEN_BG_DARK, TWB.CLR_GREEN_MED);
-    this.drawBar(ctx, px, hudY + 37, 70, 6, s.hunger, TWB.CLR_BAR_GOLD_BG, TWB.CLR_GOLD_DARK);
-    this.drawBar(ctx, px, hudY + 47, 70, 6, s.thirst, TWB.CLR_BLUE_BG_DEEP, TWB.CLR_BLUE_MED);
+    var px = pad + faceSize + pad;
+    var labelPad = 8;
+    ctx.font = TWB.FONT_XS;
+    var sampleLbl = ctx.measureText('HP - 100/100').width;
+    var barW = sec1W - px - sampleLbl - labelPad - pad;
+    if (barW < 30) barW = 30;
+    var barH = Math.max(4, Math.floor(hudH * 0.08));
+    var barGap = Math.floor((hudH - pad * 2 - 14) / 4);
     ctx.font = TWB.FONT_SM;
+    ctx.fillStyle = TWB.CLR_GOLD;
+    ctx.fillText(this.playerName || 'PLAYER', px, hudY + pad);
+    var barsTop = hudY + pad + 14;
+    this.drawBar(ctx, px, barsTop, barW, barH, s.health, TWB.CLR_RED_BG_DEEP, TWB.CLR_RED_DEEP);
+    this.drawBar(ctx, px, barsTop + barGap, barW, barH, s.energy, TWB.CLR_GREEN_BG_DARK, TWB.CLR_GREEN_MED);
+    this.drawBar(ctx, px, barsTop + barGap * 2, barW, barH, s.hunger, TWB.CLR_BAR_GOLD_BG, TWB.CLR_GOLD_DARK);
+    this.drawBar(ctx, px, barsTop + barGap * 3, barW, barH, s.thirst, TWB.CLR_BLUE_BG_DEEP, TWB.CLR_BLUE_MED);
+    ctx.font = TWB.FONT_XS;
     ctx.fillStyle = TWB.CLR_TEXT_DIM;
-    ctx.fillText('HP', px + 73, hudY + 17);
-    ctx.fillText('EN', px + 73, hudY + 27);
-    ctx.fillText('HU', px + 73, hudY + 37);
-    ctx.fillText('TH', px + 73, hudY + 47);
-    if (s.hunger < 20) { ctx.fillStyle = '#c03030'; ctx.fillText('HUNGRY!', px, hudY + 60); }
-    else if (s.thirst < 20) { ctx.fillStyle = '#2060c0'; ctx.fillText('THIRSTY!', px, hudY + 60); }
+    var lblX = px + barW + labelPad;
+    ctx.fillText('HP - ' + Math.floor(s.health) + '/100', lblX, barsTop);
+    ctx.fillText('EN - ' + Math.floor(s.energy) + '/100', lblX, barsTop + barGap);
+    ctx.fillText('HU - ' + Math.floor(s.hunger) + '/100', lblX, barsTop + barGap * 2);
+    ctx.fillText('TH - ' + Math.floor(s.thirst) + '/100', lblX, barsTop + barGap * 3);
+    if (s.hunger < 20) { ctx.fillStyle = '#c03030'; ctx.font = TWB.FONT_SM; ctx.fillText('HUNGRY!', px, hudY + hudH - pad - 8); }
+    else if (s.thirst < 20) { ctx.fillStyle = '#2060c0'; ctx.font = TWB.FONT_SM; ctx.fillText('THIRSTY!', px, hudY + hudH - pad - 8); }
 
     ctx.fillStyle = TWB.CLR_BORDER;
-    ctx.fillRect(160, hudY + 5, 1, hudH - 10);
+    ctx.fillRect(sep1, hudY + pad, 1, hudH - pad * 2);
 
-    ctx.font = TWB.FONT_SM;
-    ctx.fillStyle = TWB.CLR_GOLD;
-    ctx.fillText('BACKPACK [TAB]', 176, hudY + 5);
-    ctx.font = TWB.FONT_SM;
-    var col1x = 176;
-    var col2x = 340;
-    var itemRow = 0;
-    var usedSlots = 0;
-    for (var bi = 0; bi < this.backpack.length; bi++) {
-        var slot = this.backpack[bi];
-        if (slot) {
-            var colX = itemRow < 4 ? col1x : col2x;
-            var rowY = hudY + 18 + (itemRow < 4 ? itemRow : itemRow - 4) * 11;
-            var label = (TWB.ITEM_LABELS[slot.type] || slot.type) + ': ' + slot.count;
-            ctx.fillStyle = TWB.CLR_TEXT_LIGHT;
-            ctx.fillText(label, colX, rowY);
-            itemRow++;
-            usedSlots++;
+    if (showBp) {
+        var bpX = sep1 + pad;
+        ctx.font = TWB.FONT_SM;
+        ctx.fillStyle = TWB.CLR_GOLD;
+        ctx.fillText('BACKPACK [TAB]', bpX, hudY + pad);
+        var col1x = bpX;
+        var col2x = bpX + Math.floor(sec2W / 2);
+        var itemRow = 0;
+        var usedSlots = 0;
+        var itemGap = Math.floor((hudH - pad * 2 - 24) / 4);
+        for (var bi = 0; bi < this.backpack.length; bi++) {
+            var slot = this.backpack[bi];
+            if (slot) {
+                var colX = itemRow < 4 ? col1x : col2x;
+                var rowY = hudY + pad + 14 + (itemRow < 4 ? itemRow : itemRow - 4) * itemGap;
+                var label = (TWB.ITEM_LABELS[slot.type] || slot.type) + ': ' + slot.count;
+                ctx.fillStyle = TWB.CLR_TEXT_LIGHT;
+                ctx.fillText(label, colX, rowY);
+                itemRow++;
+                usedSlots++;
+            }
         }
-    }
-    if (usedSlots === 0) {
-        ctx.fillStyle = TWB.CLR_TEXT_DARK;
-        ctx.fillText('Empty', col1x, hudY + 30);
-    }
-    ctx.fillStyle = TWB.CLR_TEXT_GRAY;
-    ctx.fillText(usedSlots + '/10 slots', 176, hudY + 65);
+        if (usedSlots === 0) {
+            ctx.fillStyle = TWB.CLR_TEXT_DARK;
+            ctx.fillText('Empty', col1x, hudY + pad + 20);
+        }
+        ctx.fillStyle = TWB.CLR_TEXT_GRAY;
+        ctx.fillText(usedSlots + '/10 slots', bpX, hudY + hudH - pad - 8);
 
-    ctx.fillStyle = TWB.CLR_BORDER;
-    ctx.fillRect(500, hudY + 5, 1, hudH - 10);
+        ctx.fillStyle = TWB.CLR_BORDER;
+        ctx.fillRect(sep2, hudY + pad, 1, hudH - pad * 2);
+    }
 
+    var dogPad = pad;
+    var dogFaceX = sep2 + dogPad;
     var faceD = TWB.Resources.face_dog;
     if (this.dogStolen) {
         if (faceD) {
             ctx.save();
             ctx.globalAlpha = 0.3;
-            var fdH2 = Math.floor(faceD.height * (60 / faceD.width));
-            ctx.drawImage(faceD, 506, hudY + 10, 60, fdH2);
+            var fdH2 = Math.floor(faceD.height * (faceSize / faceD.width));
+            ctx.drawImage(faceD, dogFaceX, hudY + pad, faceSize, fdH2);
             ctx.restore();
         }
+        var dwx = dogFaceX + faceSize + dogPad;
         ctx.font = TWB.FONT_SM;
         ctx.fillStyle = TWB.CLR_RED_DARK;
-        ctx.fillText(this.dogName || 'WOLF', 572, hudY + 5);
+        ctx.fillText(this.dogName || 'WOLF', dwx, hudY + pad);
         ctx.fillStyle = TWB.CLR_RED_BG;
-        ctx.fillText('MISSING', 572, hudY + 22);
+        ctx.fillText('MISSING', dwx, hudY + pad + 16);
         if (this.questRevealed) {
             ctx.fillStyle = TWB.CLR_GOLD_DARK;
-            ctx.fillText('TRACKED', 572, hudY + 36);
+            ctx.fillText('TRACKED', dwx, hudY + pad + 30);
         } else {
             ctx.fillStyle = TWB.CLR_TEXT_GRAY;
-            ctx.fillText('Shrines: ' + this.questShrinesLit + '/3', 572, hudY + 36);
+            ctx.fillText('Shrines: ' + this.questShrinesLit + '/3', dwx, hudY + pad + 30);
         }
         var qTimeLeft = Math.max(0, this.questTimerMax - this.questTimer);
         var qHours = Math.floor(qTimeLeft / 3600);
         var qMins = Math.floor((qTimeLeft % 3600) / 60);
         ctx.fillStyle = qHours < 12 ? TWB.CLR_RED_DARK : TWB.CLR_GOLD_DARK;
-        ctx.fillText(qHours + 'h ' + qMins + 'm left', 572, hudY + 50);
+        ctx.fillText(qHours + 'h ' + qMins + 'm left', dwx, hudY + pad + 44);
     } else {
         if (faceD) {
-            var fdH = Math.floor(faceD.height * (60 / faceD.width));
-            ctx.drawImage(faceD, 506, hudY + 10, 60, fdH);
+            var fdH = Math.floor(faceD.height * (faceSize / faceD.width));
+            ctx.drawImage(faceD, dogFaceX, hudY + pad, faceSize, fdH);
         }
+        var dwx2 = dogFaceX + faceSize + dogPad;
+        var dBarW = sec3W - faceSize - dogPad * 3 - sampleLbl - labelPad;
+        if (dBarW < 30) dBarW = 30;
         ctx.font = TWB.FONT_SM;
         ctx.fillStyle = TWB.CLR_GOLD;
-        var wx = 572;
-        ctx.fillText(this.dogName || 'WOLF', wx, hudY + 5);
-        this.drawBar(ctx, wx, hudY + 17, 60, 6, ws.health, TWB.CLR_RED_BG_DEEP, TWB.CLR_RED_DEEP);
-        this.drawBar(ctx, wx, hudY + 27, 60, 6, ws.energy, TWB.CLR_GREEN_BG_DARK, TWB.CLR_GREEN_MED);
-        this.drawBar(ctx, wx, hudY + 37, 60, 6, ws.hunger, TWB.CLR_BAR_GOLD_BG, TWB.CLR_GOLD_DARK);
-        this.drawBar(ctx, wx, hudY + 47, 60, 6, ws.thirst, TWB.CLR_BLUE_BG_DEEP, TWB.CLR_BLUE_MED);
+        var dogNameStr = this.dogName || 'WOLF';
+        ctx.fillText(dogNameStr, dwx2, hudY + pad);
+        var moodColor = ws.mood === 'Happy' ? '#50c050' : ws.mood === 'Loyal' ? TWB.CLR_GREEN_MUTED : ws.mood === 'Hungry' ? TWB.CLR_GOLD_DARK : ws.mood === 'Tired' ? '#a0a040' : TWB.CLR_RED_MED;
+        var nameW = ctx.measureText(dogNameStr).width;
+        ctx.fillStyle = moodColor;
+        ctx.fillText(' - ' + ws.mood, dwx2 + nameW, hudY + pad);
+        this.drawBar(ctx, dwx2, barsTop, dBarW, barH, ws.health, TWB.CLR_RED_BG_DEEP, TWB.CLR_RED_DEEP);
+        this.drawBar(ctx, dwx2, barsTop + barGap, dBarW, barH, ws.energy, TWB.CLR_GREEN_BG_DARK, TWB.CLR_GREEN_MED);
+        this.drawBar(ctx, dwx2, barsTop + barGap * 2, dBarW, barH, ws.hunger, TWB.CLR_BAR_GOLD_BG, TWB.CLR_GOLD_DARK);
+        this.drawBar(ctx, dwx2, barsTop + barGap * 3, dBarW, barH, ws.thirst, TWB.CLR_BLUE_BG_DEEP, TWB.CLR_BLUE_MED);
         ctx.font = TWB.FONT_XS;
         ctx.fillStyle = TWB.CLR_TEXT_DIM;
-        ctx.fillText('HP', wx + 63, hudY + 17);
-        ctx.fillText('EN', wx + 63, hudY + 27);
-        ctx.fillText('HU', wx + 63, hudY + 37);
-        ctx.fillText('TH', wx + 63, hudY + 47);
-
-        var moodColor = ws.mood === 'Happy' ? '#50c050' : ws.mood === 'Loyal' ? TWB.CLR_GREEN_MUTED : ws.mood === 'Hungry' ? TWB.CLR_GOLD_DARK : ws.mood === 'Tired' ? '#a0a040' : TWB.CLR_RED_MED;
-        ctx.font = TWB.FONT_SM;
-        ctx.fillStyle = moodColor;
-        ctx.fillText(ws.mood, wx, hudY + 60);
-    }
-
-    ctx.fillStyle = TWB.CLR_BORDER;
-    ctx.fillRect(660, hudY + 5, 1, hudH - 10);
-
-    var ffx = 664;
-    var fireLbl = this.indoors ? 'HEARTH' : 'FIRE';
-    var fireFl = this.indoors ? this.fireplaceFuel : this.fireFuel;
-    ctx.font = TWB.FONT_SM;
-    ctx.fillStyle = TWB.CLR_GOLD;
-    ctx.fillText(fireLbl, ffx, hudY + 5);
-    var fuelColor = fireFl > 40 ? '#c07020' : fireFl > 15 ? '#a05010' : '#802010';
-    this.drawBar(ctx, ffx, hudY + 17, 90, 6, fireFl, TWB.CLR_BAR_FIRE_BG, fuelColor);
-    ctx.font = TWB.FONT_SM;
-    ctx.fillStyle = TWB.CLR_TEXT_DIM;
-    ctx.fillText('FUEL', ffx + 93, hudY + 17);
-    ctx.fillStyle = fireFl > 0 ? TWB.CLR_BROWN_WARM : TWB.CLR_RED_BG;
-    ctx.fillText(Math.floor(fireFl), ffx + 44, hudY + 17);
-    if (fireFl <= 0) {
-        ctx.fillStyle = TWB.CLR_RED_DARK;
-        ctx.fillText(this.indoors ? 'NOT LIT' : 'FIRE OUT!', ffx, hudY + 32);
-    } else if (fireFl < 20) {
-        ctx.fillStyle = TWB.CLR_BROWN_WARM;
-        ctx.fillText('Low fuel...', ffx, hudY + 32);
+        var dLblX = dwx2 + dBarW + labelPad;
+        ctx.fillText('HP - ' + Math.floor(ws.health) + '/100', dLblX, barsTop);
+        ctx.fillText('EN - ' + Math.floor(ws.energy) + '/100', dLblX, barsTop + barGap);
+        ctx.fillText('HU - ' + Math.floor(ws.hunger) + '/100', dLblX, barsTop + barGap * 2);
+        ctx.fillText('TH - ' + Math.floor(ws.thirst) + '/100', dLblX, barsTop + barGap * 3);
     }
 };
 

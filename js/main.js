@@ -54,6 +54,9 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
+        TWB.Audio.init();
+        TWB.Audio.resume();
+
         startScreen.style.display = 'none';
         gameWrapper.style.display = 'flex';
 
@@ -73,11 +76,25 @@ document.addEventListener('DOMContentLoaded', function() {
             TWB.WORLD_H = TWB.ROWS * TWB.TILE;
 
             var canvas = document.getElementById('game-canvas');
+            var baseH = 520;
+            var ratio = window.innerWidth / window.innerHeight;
+            canvas.height = baseH;
+            canvas.width = Math.round(baseH * ratio);
+
             var game = new TWB.Game(canvas);
             game.playerName = pName;
             game.dogName = dName;
             game.difficulty = selectedDifficulty;
             window._game = game;
+
+            window.addEventListener('resize', function() {
+                var r = window.innerWidth / window.innerHeight;
+                canvas.width = Math.round(baseH * r);
+                canvas.height = baseH;
+                game.ctx.imageSmoothingEnabled = false;
+                game.camera.vw = canvas.width;
+                game.camera.vh = canvas.height;
+            });
 
             function loop() {
                 game.update();
@@ -297,6 +314,11 @@ document.addEventListener('DOMContentLoaded', function() {
             TWB.WORLD_H = TWB.ROWS * TWB.TILE;
 
             var canvas = document.getElementById('game-canvas');
+            var baseH = 520;
+            var ratio = window.innerWidth / window.innerHeight;
+            canvas.height = baseH;
+            canvas.width = Math.round(baseH * ratio);
+
             var savedGenerate = TWB.generateObjects;
             TWB.generateObjects = TWB.generateTutorialObjects;
             var game = new TWB.Game(canvas);
@@ -306,6 +328,15 @@ document.addEventListener('DOMContentLoaded', function() {
             game.difficulty = 0;
             game.initTutorial();
             window._game = game;
+
+            window.addEventListener('resize', function() {
+                var r = window.innerWidth / window.innerHeight;
+                canvas.width = Math.round(baseH * r);
+                canvas.height = baseH;
+                game.ctx.imageSmoothingEnabled = false;
+                game.camera.vw = canvas.width;
+                game.camera.vh = canvas.height;
+            });
 
             function loop() {
                 game.update();

@@ -15,10 +15,10 @@ TWB.NOTIFY_TIME = 240;
 TWB.NOTIFY_LONG = 360;
 TWB.NOTIFY_XLNG = 600;
 
-TWB.FONT_XS = '7px "Press Start 2P", monospace';
-TWB.FONT_SM = '8px "Press Start 2P", monospace';
-TWB.FONT_MD = '9px "Press Start 2P", monospace';
-TWB.FONT_LG = '10px "Press Start 2P", monospace';
+TWB.FONT_XS = '8px "Press Start 2P", monospace';
+TWB.FONT_SM = '10px "Press Start 2P", monospace';
+TWB.FONT_MD = '12px "Press Start 2P", monospace';
+TWB.FONT_LG = '16px "Press Start 2P", monospace';
 TWB.FONT_XL = '24px "Press Start 2P", monospace';
 
 TWB.MSG_FULL = 'Backpack is full!';
@@ -191,6 +191,9 @@ TWB.CLR_BROWN_PANEL = '#2e2018';
 TWB.CLR_BROWN_PANEL_DARK = '#241a12';
 TWB.CLR_BAR_GOLD_BG = '#3a2a08';
 TWB.CLR_BAR_FIRE_BG = '#1a0a04';
+
+TWB.CURSOR_DEFAULT = "url('resources/icons/mouse.png'), auto";
+TWB.CURSOR_POINTER = "url('resources/icons/hover-action.png'), pointer";
 
 TWB.T_GRASS1 = 0;
 TWB.T_GRASS2 = 1;

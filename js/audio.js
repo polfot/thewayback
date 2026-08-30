@@ -7,6 +7,8 @@ TWB.Audio = {
     sfxGain: null,
     initialized: false,
     ambientNodes: {},
+    _normGains: {},
+    TARGET_RMS: 0.15,
 
     init: function() {
         if (this.initialized) return;
@@ -186,62 +188,93 @@ TWB.Audio = {
         noise.stop(now + 1.0);
     },
 
-    startRain: function() {
-        if (!this.initialized || this.ambientNodes.rain) return;
-        var ctx = this.ctx;
-        var buf = this.createNoise(2, 'white');
-        var src = ctx.createBufferSource();
-        src.buffer = buf;
-        src.loop = true;
-        var flt = ctx.createBiquadFilter();
-        flt.type = 'highpass';
-        flt.frequency.value = 4000;
-        var flt2 = ctx.createBiquadFilter();
-        flt2.type = 'lowpass';
-        flt2.frequency.value = 8000;
-        var g = ctx.createGain();
-        g.gain.value = 0.08;
-        src.connect(flt);
-        flt.connect(flt2);
-        flt2.connect(g);
-        g.connect(this.ambientGain);
+    _analyzeRMS: function(name, decoded) {
+        var sum = 0;
+        var total = 0;
+        for (var ch = 0; ch < decoded.numberOfChannels; ch++) {
+            var data = decoded.getChannelData(ch);
+            for (var i = 0; i < data.length; i++) {
+                sum += data[i] * data[i];
+            }
+            total += data.length;
+        }
+        var rms = Math.sqrt(sum / total);
+        var gain = rms > 0.001 ? this.TARGET_RMS / rms : 1;
+        if (gain > 4) gain = 4;
+        this._normGains[name] = gain;
+    },
+
+    _normVol: function(name, vol) {
+        var ng = this._normGains[name];
+        return ng ? vol * ng : vol;
+    },
+
+    _decodeAndPlay: function(name, loop, gainNode, vol) {
+        var self = this;
+        var raw = TWB.AudioBuffers[name];
+        if (!raw) return;
+        this.ctx.decodeAudioData(raw.slice(0), function(decoded) {
+            TWB.AudioBuffers[name + '_decoded'] = decoded;
+            self._analyzeRMS(name, decoded);
+            var src = self.ctx.createBufferSource();
+            src.buffer = decoded;
+            src.loop = loop;
+            var g = self.ctx.createGain();
+            g.gain.value = self._normVol(name, vol);
+            src.connect(g);
+            g.connect(gainNode);
+            src.start();
+            self.ambientNodes[name] = { src: src, gain: g };
+        });
+    },
+
+    _playDecoded: function(name, loop, gainNode, vol) {
+        var decoded = TWB.AudioBuffers[name + '_decoded'];
+        if (!decoded) {
+            this._decodeAndPlay(name, loop, gainNode, vol);
+            return;
+        }
+        if (!this._normGains[name]) this._analyzeRMS(name, decoded);
+        var src = this.ctx.createBufferSource();
+        src.buffer = decoded;
+        src.loop = loop;
+        var g = this.ctx.createGain();
+        g.gain.value = this._normVol(name, vol);
+        src.connect(g);
+        g.connect(gainNode);
         src.start();
-        this.ambientNodes.rain = { src: src, gain: g };
+        this.ambientNodes[name] = { src: src, gain: g };
+    },
+
+    startRain: function() {
+        if (!this.initialized || this.ambientNodes.rain_loop) return;
+        this._playDecoded('rain_loop', true, this.ambientGain, 0);
+        var self = this;
+        setTimeout(function() {
+            var r = self.ambientNodes.rain_loop;
+            if (r) r.gain.gain.linearRampToValueAtTime(self._normVol('rain_loop', 0.4), self.ctx.currentTime + 3);
+        }, 50);
     },
 
     stopRain: function() {
-        if (!this.ambientNodes.rain) return;
-        var r = this.ambientNodes.rain;
-        r.gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 1);
+        if (!this.ambientNodes.rain_loop) return;
+        var r = this.ambientNodes.rain_loop;
+        r.gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 3);
         var s = r.src;
-        setTimeout(function() { try { s.stop(); } catch(e) {} }, 1200);
-        this.ambientNodes.rain = null;
+        setTimeout(function() { try { s.stop(); } catch(e) {} }, 3500);
+        this.ambientNodes.rain_loop = null;
     },
 
     startWind: function(speed) {
         if (!this.initialized) return;
-        if (!this.ambientNodes.wind) {
-            var ctx = this.ctx;
-            var buf = this.createNoise(3, 'brown');
-            var src = ctx.createBufferSource();
-            src.buffer = buf;
-            src.loop = true;
-            var flt = ctx.createBiquadFilter();
-            flt.type = 'lowpass';
-            flt.frequency.value = 300;
-            var g = ctx.createGain();
-            g.gain.value = 0;
-            src.connect(flt);
-            flt.connect(g);
-            g.connect(this.ambientGain);
-            src.start();
-            this.ambientNodes.wind = { src: src, gain: g, filter: flt };
+        if (!this.ambientNodes.wind_loop) {
+            this._playDecoded('wind_loop', true, this.ambientGain, 0);
         }
-        var vol = Math.min(0.2, speed * 0.06);
-        var freq = 200 + speed * 80;
-        var w = this.ambientNodes.wind;
-        w.gain.gain.linearRampToValueAtTime(vol, this.ctx.currentTime + 0.5);
-        w.filter.frequency.linearRampToValueAtTime(freq, this.ctx.currentTime + 0.5);
+        var vol = Math.min(0.5, speed * 0.15);
+        var w = this.ambientNodes.wind_loop;
+        if (w) {
+            w.gain.gain.linearRampToValueAtTime(this._normVol('wind_loop', vol), this.ctx.currentTime + 2);
+        }
     },
 
     playRiver: function(game, riverX, riverY) {
@@ -341,6 +374,70 @@ TWB.Audio = {
             osc.stop(now + 1.3);
             vib.stop(now + 1.3);
         });
+    },
+
+    playSFX: function(name, loop, vol) {
+        if (!this.initialized) return null;
+        var decoded = TWB.AudioBuffers[name + '_decoded'];
+        var raw = TWB.AudioBuffers[name];
+        if (!decoded && !raw) return null;
+        if (decoded) {
+            if (!this._normGains[name]) this._analyzeRMS(name, decoded);
+            var src = this.ctx.createBufferSource();
+            src.buffer = decoded;
+            src.loop = !!loop;
+            var g = this.ctx.createGain();
+            g.gain.value = this._normVol(name, vol || 0.5);
+            src.connect(g);
+            g.connect(this.sfxGain);
+            src.start();
+            return { src: src, gain: g };
+        }
+        var self = this;
+        this.ctx.decodeAudioData(raw.slice(0), function(buf) {
+            TWB.AudioBuffers[name + '_decoded'] = buf;
+            self._analyzeRMS(name, buf);
+            self.playSFX(name, loop, vol);
+        });
+        return null;
+    },
+
+    stopAmbient: function(name) {
+        if (!this.ambientNodes[name]) return;
+        var node = this.ambientNodes[name];
+        node.gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.5);
+        var s = node.src;
+        setTimeout(function() { try { s.stop(); } catch(e) {} }, 700);
+        this.ambientNodes[name] = null;
+    },
+
+    startFootsteps: function() {
+        if (!this.initialized || this.ambientNodes.footstep) return;
+        this._playDecoded('footstep', true, this.sfxGain, 0.3);
+    },
+
+    stopFootsteps: function() {
+        if (!this.ambientNodes.footstep) return;
+        var node = this.ambientNodes.footstep;
+        try { node.src.stop(); } catch(e) {}
+        this.ambientNodes.footstep = null;
+    },
+
+    updateFire: function(vol) {
+        if (!this.initialized) return;
+        if (vol > 0.01) {
+            if (!this.ambientNodes.fire) {
+                this._playDecoded('fire', true, this.ambientGain, 0);
+            }
+            var f = this.ambientNodes.fire;
+            if (f) f.gain.gain.linearRampToValueAtTime(this._normVol('fire', vol), this.ctx.currentTime + 0.3);
+        } else if (this.ambientNodes.fire) {
+            var node = this.ambientNodes.fire;
+            node.gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 1.5);
+            var s = node.src;
+            setTimeout(function() { try { s.stop(); } catch(e) {} }, 2000);
+            this.ambientNodes.fire = null;
+        }
     },
 
     bushRustle: function(game, wx, wy) {
