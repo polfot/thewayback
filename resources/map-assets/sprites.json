@@ -1,0 +1,287 @@
+{
+  "format": "rgba-png",
+  "pixel_art": true,
+  "outline": "#3a2a14",
+  "sprites": [
+    {
+      "name": "pine_tree",
+      "file": "pine_tree.png",
+      "x": 16,
+      "y": 14,
+      "width": 8,
+      "height": 11
+    },
+    {
+      "name": "deciduous_tree",
+      "file": "deciduous_tree.png",
+      "x": 55,
+      "y": 15,
+      "width": 10,
+      "height": 10
+    },
+    {
+      "name": "dead_tree",
+      "file": "dead_tree.png",
+      "x": 95,
+      "y": 14,
+      "width": 9,
+      "height": 11
+    },
+    {
+      "name": "cabin",
+      "file": "cabin.png",
+      "x": 133,
+      "y": 14,
+      "width": 13,
+      "height": 12
+    },
+    {
+      "name": "relay_station",
+      "file": "relay_station.png",
+      "x": 174,
+      "y": 13,
+      "width": 12,
+      "height": 14
+    },
+    {
+      "name": "windmill",
+      "file": "windmill.png",
+      "x": 213,
+      "y": 12,
+      "width": 13,
+      "height": 15
+    },
+    {
+      "name": "boulder_cluster",
+      "file": "boulder_cluster.png",
+      "x": 13,
+      "y": 55,
+      "width": 13,
+      "height": 9
+    },
+    {
+      "name": "bush",
+      "file": "bush.png",
+      "x": 55,
+      "y": 56,
+      "width": 10,
+      "height": 7
+    },
+    {
+      "name": "berry_bush",
+      "file": "berry_bush.png",
+      "x": 95,
+      "y": 56,
+      "width": 10,
+      "height": 7
+    },
+    {
+      "name": "herb_flower",
+      "file": "herb_flower.png",
+      "x": 136,
+      "y": 55,
+      "width": 8,
+      "height": 10
+    },
+    {
+      "name": "mushroom",
+      "file": "mushroom.png",
+      "x": 176,
+      "y": 56,
+      "width": 7,
+      "height": 8
+    },
+    {
+      "name": "cairn",
+      "file": "cairn.png",
+      "x": 215,
+      "y": 54,
+      "width": 9,
+      "height": 11
+    },
+    {
+      "name": "river_straight",
+      "file": "river_straight.png",
+      "x": 12,
+      "y": 92,
+      "width": 16,
+      "height": 16
+    },
+    {
+      "name": "river_curve_left",
+      "file": "river_curve_left.png",
+      "x": 52,
+      "y": 92,
+      "width": 16,
+      "height": 16
+    },
+    {
+      "name": "river_curve_right",
+      "file": "river_curve_right.png",
+      "x": 92,
+      "y": 92,
+      "width": 16,
+      "height": 16
+    },
+    {
+      "name": "river_fork",
+      "file": "river_fork.png",
+      "x": 132,
+      "y": 92,
+      "width": 16,
+      "height": 16
+    },
+    {
+      "name": "lake",
+      "file": "lake.png",
+      "x": 167,
+      "y": 91,
+      "width": 26,
+      "height": 18
+    },
+    {
+      "name": "well",
+      "file": "well.png",
+      "x": 215,
+      "y": 95,
+      "width": 10,
+      "height": 10
+    },
+    {
+      "name": "bridge",
+      "file": "bridge.png",
+      "x": 12,
+      "y": 134,
+      "width": 16,
+      "height": 11
+    },
+    {
+      "name": "broken_bridge",
+      "file": "broken_bridge.png",
+      "x": 52,
+      "y": 134,
+      "width": 16,
+      "height": 11
+    },
+    {
+      "name": "stepping_stones",
+      "file": "stepping_stones.png",
+      "x": 92,
+      "y": 135,
+      "width": 16,
+      "height": 10
+    },
+    {
+      "name": "shrine_cross",
+      "file": "shrine_cross.png",
+      "x": 135,
+      "y": 133,
+      "width": 9,
+      "height": 13
+    },
+    {
+      "name": "campfire",
+      "file": "campfire.png",
+      "x": 175,
+      "y": 135,
+      "width": 10,
+      "height": 10
+    },
+    {
+      "name": "player_marker",
+      "file": "player_marker.png",
+      "x": 216,
+      "y": 134,
+      "width": 8,
+      "height": 11
+    },
+    {
+      "name": "dog_marker",
+      "file": "dog_marker.png",
+      "x": 14,
+      "y": 176,
+      "width": 11,
+      "height": 7
+    },
+    {
+      "name": "compass_rose",
+      "file": "compass_rose.png",
+      "x": 42,
+      "y": 162,
+      "width": 36,
+      "height": 36
+    },
+    {
+      "name": "x_marker",
+      "file": "x_marker.png",
+      "x": 95,
+      "y": 175,
+      "width": 9,
+      "height": 9
+    },
+    {
+      "name": "question_marker",
+      "file": "question_marker.png",
+      "x": 136,
+      "y": 174,
+      "width": 8,
+      "height": 11
+    },
+    {
+      "name": "checkmark",
+      "file": "checkmark.png",
+      "x": 175,
+      "y": 176,
+      "width": 10,
+      "height": 8
+    },
+    {
+      "name": "backpack",
+      "file": "backpack.png",
+      "x": 215,
+      "y": 174,
+      "width": 10,
+      "height": 11
+    },
+    {
+      "name": "grass_tuft_1",
+      "file": "grass_tuft_1.png",
+      "x": 16,
+      "y": 217,
+      "width": 8,
+      "height": 6
+    },
+    {
+      "name": "grass_tuft_2",
+      "file": "grass_tuft_2.png",
+      "x": 56,
+      "y": 217,
+      "width": 8,
+      "height": 6
+    },
+    {
+      "name": "grass_tuft_3",
+      "file": "grass_tuft_3.png",
+      "x": 96,
+      "y": 217,
+      "width": 8,
+      "height": 6
+    },
+    {
+      "name": "mountain_silhouette",
+      "file": "mountain_silhouette.png",
+      "x": 124,
+      "y": 213,
+      "width": 32,
+      "height": 14
+    },
+    {
+      "name": "trail_segment",
+      "file": "trail_segment.png",
+      "x": 172,
+      "y": 217,
+      "width": 16,
+      "height": 6
+    }
+  ]
+}
