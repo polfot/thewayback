@@ -891,6 +891,11 @@ TWB.Game.prototype.setupInput = function() {
                             self.stats.health = Math.min(100, self.stats.health + 20);
                             msg = 'Used bandage (+20 HP)';
                             break;
+                        case 'dog_bandage':
+                            self.removeFromBackpack('bandage', 1);
+                            self.wolfStats.health = Math.min(100, self.wolfStats.health + 20);
+                            msg = self.getDogName() + ' healed (+20 HP)';
+                            break;
                         case 'drop1':
                             self.removeFromBackpack(slot.type, 1);
                             msg = 'Dropped 1 ' + label;
@@ -1748,7 +1753,7 @@ TWB.Game.prototype.getBackpackBtns = function() {
     var slot = this.backpack[this.backpackHover];
     if (TWB.EDIBLE[slot.type]) return ['eat', 'feed', 'drop1', 'dropall'];
     if (slot.type === 'canteen_full') return ['drink_canteen', 'dog_drink_canteen', 'drop1', 'dropall'];
-    if (slot.type === 'bandage') return ['use_bandage', 'drop1', 'dropall'];
+    if (slot.type === 'bandage') return ['use_bandage', 'dog_bandage', 'drop1', 'dropall'];
     return ['drop1', 'dropall'];
 };
 
@@ -1764,7 +1769,7 @@ TWB.Game.prototype.getBackpackBtnAt = function(sx, sy) {
     var gapY = 6;
     var dName = this.getDogName();
     if (dName.length > 6) dName = dName.substring(0, 5) + '.';
-    var btnLabels = { eat: 'Eat', feed: 'Feed ' + dName, drop1: 'Drop 1', dropall: 'Drop All', drink_canteen: 'Drink', dog_drink_canteen: 'Give ' + dName, use_bandage: 'Use' };
+    var btnLabels = { eat: 'Eat', feed: 'Feed ' + dName, drop1: 'Drop 1', dropall: 'Drop All', drink_canteen: 'Drink', dog_drink_canteen: 'Give ' + dName, use_bandage: 'Use', dog_bandage: 'Heal ' + dName };
     var ctx = this.ctx;
     ctx.font = TWB.FONT_SM;
     var btnWidths = [];
@@ -7330,12 +7335,13 @@ TWB.Game.prototype.drawBackpack = function() {
         var startX = l.px + Math.floor((l.pw - btnW * 2 - gapX) / 2);
         var dName = this.getDogName();
         if (dName.length > 6) dName = dName.substring(0, 5) + '.';
-        var btnLabels = { eat: 'Eat', feed: 'Feed ' + dName, drop1: 'Drop 1', dropall: 'Drop All', drink_canteen: 'Drink', dog_drink_canteen: 'Give ' + dName, use_bandage: 'Use' };
+        var btnLabels = { eat: 'Eat', feed: 'Feed ' + dName, drop1: 'Drop 1', dropall: 'Drop All', drink_canteen: 'Drink', dog_drink_canteen: 'Give ' + dName, use_bandage: 'Use', dog_bandage: 'Heal ' + dName };
         var btnColors = { eat: [TWB.CLR_GREEN_BG, TWB.CLR_GREEN_DARK, TWB.CLR_GREEN, TWB.CLR_GREEN_LIGHT],
                           feed: [TWB.CLR_BLUE_BG_DARK, TWB.CLR_BLUE_BG, TWB.CLR_BLUE, TWB.CLR_BLUE_LIGHT],
                           drink_canteen: [TWB.CLR_GREEN_BG, TWB.CLR_GREEN_DARK, TWB.CLR_GREEN, TWB.CLR_GREEN_LIGHT],
                           dog_drink_canteen: [TWB.CLR_BLUE_BG_DARK, TWB.CLR_BLUE_BG, TWB.CLR_BLUE, TWB.CLR_BLUE_LIGHT],
                           use_bandage: [TWB.CLR_GREEN_BG, TWB.CLR_GREEN_DARK, TWB.CLR_GREEN, TWB.CLR_GREEN_LIGHT],
+                          dog_bandage: [TWB.CLR_BLUE_BG_DARK, TWB.CLR_BLUE_BG, TWB.CLR_BLUE, TWB.CLR_BLUE_LIGHT],
                           drop1: [TWB.CLR_RED_BG_BLACK, TWB.CLR_RED_BG_DARK, TWB.CLR_RED_MED, TWB.CLR_RED_LIGHT],
                           dropall: [TWB.CLR_RED_BG_BLACK, TWB.CLR_RED_BG_DARK, TWB.CLR_RED_MED, TWB.CLR_RED_LIGHT] };
 

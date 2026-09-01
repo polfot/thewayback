@@ -592,6 +592,7 @@ TWB.CABIN_TYPES = [
         interior: [
             { type: 'fireplace', gx: 1, gy: 1 },
             { type: 'bed', gx: 6, gy: 3 },
+            { type: 'crate', gx: 1, gy: 3 },
             { type: 'table', gx: 6, gy: 5, desc: 'An empty water bottle. Torn map pieces.' },
             { type: 'note', gx: 3, gy: 2 },
             { type: 'cabin_window', gx: 2, gy: 5 }
