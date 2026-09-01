@@ -60,6 +60,20 @@ document.addEventListener('DOMContentLoaded', function() {
         startScreen.style.display = 'none';
         gameWrapper.style.display = 'flex';
 
+        var canvas = document.getElementById('game-canvas');
+        var baseH = 520;
+        var ratio = window.innerWidth / window.innerHeight;
+        canvas.height = baseH;
+        canvas.width = Math.round(baseH * ratio);
+        var lctx = canvas.getContext('2d');
+        lctx.imageSmoothingEnabled = false;
+        lctx.fillStyle = '#000';
+        lctx.fillRect(0, 0, canvas.width, canvas.height);
+        lctx.font = "12px 'Press Start 2P', monospace";
+        lctx.fillStyle = '#d4a44a';
+        lctx.textAlign = 'center';
+        lctx.fillText('Loading...', canvas.width / 2, canvas.height / 2);
+
         TWB.loadResources(function() {
             TWB.initSprites();
 
@@ -75,34 +89,35 @@ document.addEventListener('DOMContentLoaded', function() {
             TWB.WORLD_W = TWB.COLS * TWB.TILE;
             TWB.WORLD_H = TWB.ROWS * TWB.TILE;
 
-            var canvas = document.getElementById('game-canvas');
-            var baseH = 520;
-            var ratio = window.innerWidth / window.innerHeight;
-            canvas.height = baseH;
-            canvas.width = Math.round(baseH * ratio);
+            lctx.fillStyle = '#000';
+            lctx.fillRect(0, 0, canvas.width, canvas.height);
+            lctx.fillStyle = '#d4a44a';
+            lctx.fillText('Generating world...', canvas.width / 2, canvas.height / 2);
 
-            var game = new TWB.Game(canvas);
-            game.playerName = pName;
-            game.dogName = dName;
-            game.difficulty = selectedDifficulty;
-            window._game = game;
+            setTimeout(function() {
+                var game = new TWB.Game(canvas);
+                game.playerName = pName;
+                game.dogName = dName;
+                game.difficulty = selectedDifficulty;
+                window._game = game;
 
-            window.addEventListener('resize', function() {
-                var r = window.innerWidth / window.innerHeight;
-                canvas.width = Math.round(baseH * r);
-                canvas.height = baseH;
-                game.ctx.imageSmoothingEnabled = false;
-                game.camera.vw = canvas.width;
-                game.camera.vh = canvas.height;
-            });
+                window.addEventListener('resize', function() {
+                    var r = window.innerWidth / window.innerHeight;
+                    canvas.width = Math.round(baseH * r);
+                    canvas.height = baseH;
+                    game.ctx.imageSmoothingEnabled = false;
+                    game.camera.vw = canvas.width;
+                    game.camera.vh = canvas.height;
+                });
 
-            function loop() {
-                game.update();
-                game.render();
+                function loop() {
+                    game.update();
+                    game.render();
+                    requestAnimationFrame(loop);
+                }
+
                 requestAnimationFrame(loop);
-            }
-
-            requestAnimationFrame(loop);
+            }, 50);
         });
     }
 

@@ -89,12 +89,12 @@ TWB.MAP_SPRITE_LIST = [
 ];
 
 TWB.loadResources = function(callback) {
-    var total = TWB.RESOURCE_LIST.length + TWB.WINDOW_VIEW_LIST.length + TWB.CUTSCENE_LIST.length + TWB.HUD_ICON_LIST.length + TWB.AUDIO_LIST.length + TWB.MAP_SPRITE_LIST.length;
-    var loaded = 0;
+    var visualTotal = TWB.RESOURCE_LIST.length + TWB.WINDOW_VIEW_LIST.length + TWB.CUTSCENE_LIST.length + TWB.HUD_ICON_LIST.length + TWB.MAP_SPRITE_LIST.length;
+    var visualLoaded = 0;
 
-    if (total === 0) { callback(); return; }
+    if (visualTotal === 0) { callback(); return; }
 
-    var done = function() { loaded++; if (loaded >= total) callback(); };
+    var visualDone = function() { visualLoaded++; if (visualLoaded >= visualTotal) callback(); };
 
     TWB.RESOURCE_LIST.forEach(function(res) {
         var img = new Image();
@@ -113,37 +113,37 @@ TWB.loadResources = function(callback) {
                 x: Math.floor(w * res.ax),
                 y: Math.floor(h * res.ay)
             };
-            done();
+            visualDone();
         };
-        img.onerror = done;
+        img.onerror = visualDone;
         img.src = res.src;
     });
 
     TWB.WINDOW_VIEW_LIST.forEach(function(name) {
         var img = new Image();
-        img.onload = function() { TWB.WindowViews[name] = img; done(); };
-        img.onerror = done;
+        img.onload = function() { TWB.WindowViews[name] = img; visualDone(); };
+        img.onerror = visualDone;
         img.src = 'resources/' + name + '.png';
     });
 
     TWB.CUTSCENE_LIST.forEach(function(name) {
         var img = new Image();
-        img.onload = function() { TWB.CutsceneImages[name] = img; done(); };
-        img.onerror = done;
+        img.onload = function() { TWB.CutsceneImages[name] = img; visualDone(); };
+        img.onerror = visualDone;
         img.src = 'resources/' + name + '.png';
     });
 
     TWB.HUD_ICON_LIST.forEach(function(icon) {
         var img = new Image();
-        img.onload = function() { TWB.HudIcons[icon.name] = img; done(); };
-        img.onerror = done;
+        img.onload = function() { TWB.HudIcons[icon.name] = img; visualDone(); };
+        img.onerror = visualDone;
         img.src = icon.src;
     });
 
     TWB.MAP_SPRITE_LIST.forEach(function(name) {
         var img = new Image();
-        img.onload = function() { TWB.MapSprites[name] = img; done(); };
-        img.onerror = done;
+        img.onload = function() { TWB.MapSprites[name] = img; visualDone(); };
+        img.onerror = visualDone;
         img.src = 'resources/map-assets/' + name + '.png';
     });
 
@@ -155,9 +155,8 @@ TWB.loadResources = function(callback) {
             if (xhr.status === 200) {
                 TWB.AudioBuffers[snd.name] = xhr.response;
             }
-            done();
         };
-        xhr.onerror = done;
+        xhr.onerror = function() {};
         xhr.send();
     });
 };
