@@ -510,7 +510,7 @@ TWB.CABIN_TYPES = [
             { type: 'table', gx: 2, gy: 5, desc: 'A tin cup. Half-empty. A dog bowl on the floor.' },
             { type: 'shelf', gx: 1, gy: 3 },
             { type: 'note', gx: 3, gy: 2 },
-            { type: 'cabin_window', gx: 2, gy: 5 }
+            { type: 'cabin_window', gx: 4, gy: 5 }
         ]
     },
     {
@@ -521,7 +521,7 @@ TWB.CABIN_TYPES = [
         interior: [
             { type: 'fireplace', gx: 1, gy: 1 },
             { type: 'bed', gx: 6, gy: 3 },
-            { type: 'bed', gx: 6, gy: 3 },
+            { type: 'bed', gx: 4, gy: 3 },
             { type: 'cabinet', gx: 1, gy: 3 },
             { type: 'note', gx: 3, gy: 2 },
             { type: 'cabin_window', gx: 2, gy: 5 }
@@ -537,7 +537,7 @@ TWB.CABIN_TYPES = [
             { type: 'bed', gx: 6, gy: 3 },
             { type: 'table', gx: 2, gy: 4, desc: 'An open map. Red circles near the northern ridge.' },
             { type: 'cabinet', gx: 1, gy: 3 },
-            { type: 'shelf', gx: 6, gy: 3 },
+            { type: 'shelf', gx: 6, gy: 5 },
             { type: 'note', gx: 4, gy: 3 },
             { type: 'cabin_window', gx: 2, gy: 5 }
         ]

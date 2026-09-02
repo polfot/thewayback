@@ -216,6 +216,7 @@ TWB.Audio = {
         this.ctx.decodeAudioData(raw.slice(0), function(decoded) {
             TWB.AudioBuffers[name + '_decoded'] = decoded;
             self._analyzeRMS(name, decoded);
+            if (name === 'footstep' && !self._wantFootsteps) return;
             var src = self.ctx.createBufferSource();
             src.buffer = decoded;
             src.loop = loop;
@@ -248,15 +249,22 @@ TWB.Audio = {
 
     startRain: function() {
         if (!this.initialized || this.ambientNodes.rain_loop) return;
+        this._wantRain = true;
         this._playDecoded('rain_loop', true, this.ambientGain, 0);
         var self = this;
-        setTimeout(function() {
+        var fadeIn = function() {
             var r = self.ambientNodes.rain_loop;
-            if (r) r.gain.gain.linearRampToValueAtTime(self._normVol('rain_loop', 0.4), self.ctx.currentTime + 3);
-        }, 50);
+            if (r) {
+                r.gain.gain.linearRampToValueAtTime(self._normVol('rain_loop', 0.4), self.ctx.currentTime + 3);
+            } else if (self._wantRain) {
+                setTimeout(fadeIn, 100);
+            }
+        };
+        setTimeout(fadeIn, 50);
     },
 
     stopRain: function() {
+        this._wantRain = false;
         if (!this.ambientNodes.rain_loop) return;
         var r = this.ambientNodes.rain_loop;
         r.gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 3);
@@ -267,14 +275,24 @@ TWB.Audio = {
 
     startWind: function(speed) {
         if (!this.initialized) return;
+        var vol = Math.min(0.5, speed * 0.15);
+        this._windVol = vol;
         if (!this.ambientNodes.wind_loop) {
             this._playDecoded('wind_loop', true, this.ambientGain, 0);
+            var self = this;
+            var fadeIn = function() {
+                var w = self.ambientNodes.wind_loop;
+                if (w) {
+                    w.gain.gain.linearRampToValueAtTime(self._normVol('wind_loop', self._windVol), self.ctx.currentTime + 2);
+                } else {
+                    setTimeout(fadeIn, 100);
+                }
+            };
+            setTimeout(fadeIn, 50);
+            return;
         }
-        var vol = Math.min(0.5, speed * 0.15);
         var w = this.ambientNodes.wind_loop;
-        if (w) {
-            w.gain.gain.linearRampToValueAtTime(this._normVol('wind_loop', vol), this.ctx.currentTime + 2);
-        }
+        w.gain.gain.linearRampToValueAtTime(this._normVol('wind_loop', vol), this.ctx.currentTime + 2);
     },
 
     playRiver: function(game, riverX, riverY) {
@@ -413,10 +431,12 @@ TWB.Audio = {
 
     startFootsteps: function() {
         if (!this.initialized || this.ambientNodes.footstep) return;
-        this._playDecoded('footstep', true, this.sfxGain, 0.3);
+        this._wantFootsteps = true;
+        this._playDecoded('footstep', true, this.sfxGain, 0.08);
     },
 
     stopFootsteps: function() {
+        this._wantFootsteps = false;
         if (!this.ambientNodes.footstep) return;
         var node = this.ambientNodes.footstep;
         try { node.src.stop(); } catch(e) {}

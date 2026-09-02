@@ -67,14 +67,30 @@ document.addEventListener('DOMContentLoaded', function() {
         canvas.width = Math.round(baseH * ratio);
         var lctx = canvas.getContext('2d');
         lctx.imageSmoothingEnabled = false;
+
+        var loadDots = 1;
+        var loadText = 'Loading';
+        var loadInterval = setInterval(function() {
+            loadDots = loadDots >= 3 ? 1 : loadDots + 1;
+            var dots = '';
+            for (var di = 0; di < loadDots; di++) dots += '.';
+            lctx.fillStyle = '#000';
+            lctx.fillRect(0, 0, canvas.width, canvas.height);
+            lctx.font = "12px 'Press Start 2P', monospace";
+            lctx.fillStyle = '#d4a44a';
+            lctx.textAlign = 'center';
+            lctx.fillText(loadText + dots, canvas.width / 2, canvas.height / 2);
+        }, 1000);
+
         lctx.fillStyle = '#000';
         lctx.fillRect(0, 0, canvas.width, canvas.height);
         lctx.font = "12px 'Press Start 2P', monospace";
         lctx.fillStyle = '#d4a44a';
         lctx.textAlign = 'center';
-        lctx.fillText('Loading...', canvas.width / 2, canvas.height / 2);
+        lctx.fillText('Loading.', canvas.width / 2, canvas.height / 2);
 
         TWB.loadResources(function() {
+            loadText = 'Generating world';
             TWB.initSprites();
 
             if (selectedDifficulty === 2) {
@@ -89,12 +105,8 @@ document.addEventListener('DOMContentLoaded', function() {
             TWB.WORLD_W = TWB.COLS * TWB.TILE;
             TWB.WORLD_H = TWB.ROWS * TWB.TILE;
 
-            lctx.fillStyle = '#000';
-            lctx.fillRect(0, 0, canvas.width, canvas.height);
-            lctx.fillStyle = '#d4a44a';
-            lctx.fillText('Generating world...', canvas.width / 2, canvas.height / 2);
-
             setTimeout(function() {
+                clearInterval(loadInterval);
                 var game = new TWB.Game(canvas);
                 game.playerName = pName;
                 game.dogName = dName;

@@ -147,18 +147,34 @@ TWB.loadResources = function(callback) {
         img.src = 'resources/map-assets/' + name + '.png';
     });
 
-    TWB.AUDIO_LIST.forEach(function(snd) {
+    var audioIdx = 0;
+    function loadNextAudio() {
+        if (audioIdx >= TWB.AUDIO_LIST.length) return;
+        var snd = TWB.AUDIO_LIST[audioIdx];
+        audioIdx++;
         var xhr = new XMLHttpRequest();
         xhr.open('GET', snd.src, true);
         xhr.responseType = 'arraybuffer';
         xhr.onload = function() {
             if (xhr.status === 200) {
                 TWB.AudioBuffers[snd.name] = xhr.response;
+                var ctx = TWB.Audio.ctx;
+                if (ctx) {
+                    ctx.decodeAudioData(xhr.response.slice(0), function(decoded) {
+                        TWB.AudioBuffers[snd.name + '_decoded'] = decoded;
+                        loadNextAudio();
+                    }, function() { loadNextAudio(); });
+                } else {
+                    loadNextAudio();
+                }
+            } else {
+                loadNextAudio();
             }
         };
-        xhr.onerror = function() {};
+        xhr.onerror = function() { loadNextAudio(); };
         xhr.send();
-    });
+    }
+    loadNextAudio();
 };
 
 window.TWB = TWB;

@@ -12,6 +12,12 @@
     --selected-bg: #1a1a28;
     --font-pixel: 'Press Start 2P', 'Courier New', monospace;
     --font-mono: 'Courier New', monospace;
+    --font-xxs: 7px;
+    --font-xs: 8px;
+    --font-sm: 10px;
+    --font-md: 12px;
+    --font-lg: 16px;
+    --font-xl: 24px;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; cursor: url('../resources/icons/mouse.png'), auto; }
@@ -66,7 +72,7 @@ body {
 
 #start-screen h1 {
     font-family: var(--font-pixel);
-    font-size: 20px;
+    font-size: var(--font-xl);
     color: var(--accent);
     margin-bottom: 30px;
     letter-spacing: 2px;
@@ -74,14 +80,14 @@ body {
 
 #start-screen label {
     font-family: var(--font-pixel);
-    font-size: 8px;
+    font-size: var(--font-sm);
     color: var(--text-dim);
     margin-top: 14px;
 }
 
 #start-screen input {
     font-family: var(--font-pixel);
-    font-size: 12px;
+    font-size: var(--font-lg);
     color: var(--text);
     background: var(--panel);
     border: 1px solid var(--panel-border);
@@ -98,7 +104,7 @@ body {
 
 #start-screen .error-msg {
     font-family: var(--font-pixel);
-    font-size: 8px;
+    font-size: var(--font-sm);
     color: var(--error);
     height: 14px;
 }
@@ -111,7 +117,7 @@ body {
 
 .diff-btn {
     font-family: var(--font-pixel);
-    font-size: 7px;
+    font-size: var(--font-xs);
     color: var(--text-dim);
     background: var(--panel);
     border: 1px solid var(--panel-border);
@@ -134,7 +140,7 @@ body {
 
 #diff-desc {
     font-family: var(--font-pixel);
-    font-size: 6px;
+    font-size: var(--font-xxs);
     color: var(--text-dim);
     margin-top: 6px;
     height: 12px;
@@ -143,7 +149,7 @@ body {
 
 #start-btn {
     font-family: var(--font-pixel);
-    font-size: 10px;
+    font-size: var(--font-md);
     color: var(--bg);
     background: var(--accent);
     border: none;
@@ -164,7 +170,7 @@ body {
 
 #tutorial-btn {
     font-family: var(--font-pixel);
-    font-size: 7px;
+    font-size: var(--font-xs);
     color: var(--text-dim);
     background: transparent;
     border: 1px solid var(--panel-border);
@@ -200,7 +206,7 @@ body {
 
 #tutorial-title {
     font-family: var(--font-pixel);
-    font-size: 10px;
+    font-size: var(--font-md);
     color: var(--accent);
     margin-bottom: 18px;
     letter-spacing: 1px;
@@ -208,7 +214,7 @@ body {
 
 #tutorial-body {
     font-family: var(--font-pixel);
-    font-size: 7px;
+    font-size: var(--font-xs);
     color: var(--text);
     line-height: 2;
     text-align: left;
@@ -225,7 +231,7 @@ body {
 
 .tut-nav-btn {
     font-family: var(--font-pixel);
-    font-size: 7px;
+    font-size: var(--font-xs);
     color: var(--text-dim);
     background: var(--bg);
     border: 1px solid var(--panel-border);
@@ -240,13 +246,13 @@ body {
 
 #tut-page {
     font-family: var(--font-pixel);
-    font-size: 7px;
+    font-size: var(--font-xs);
     color: var(--text-dim);
 }
 
 #tut-close {
     font-family: var(--font-pixel);
-    font-size: 7px;
+    font-size: var(--font-xs);
     color: var(--text-dim);
     background: transparent;
     border: 1px solid var(--panel-border);

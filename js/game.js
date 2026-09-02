@@ -252,6 +252,7 @@ TWB.Game = function(canvas) {
 
     this.camera = new TWB.Camera(canvas.width, canvas.height);
     this.objects = TWB.generateObjects();
+    this._buildObjectGrid();
 
     var sc = TWB._cabinData[TWB._startCabin];
     var startX = sc.cx * TWB.TILE;
@@ -351,6 +352,9 @@ TWB.Game = function(canvas) {
     this.knockoutActive = false;
     this.knockoutTimer = 0;
     this.cheatBuffer = '';
+
+    this._staticNoise = null;
+    this._staticNoisePurple = null;
 
     this.shadows = [];
     this.shadowSpawnTimer = 0;
@@ -627,6 +631,93 @@ TWB.Game = function(canvas) {
     ];
 
     this.setupInput();
+};
+
+TWB.Game.prototype._buildObjectGrid = function() {
+    var CELL = 512;
+    this._gridCell = CELL;
+    this._objGrid = {};
+    this._campfires = [];
+    this._shrines = [];
+    for (var i = 0; i < this.objects.length; i++) {
+        var o = this.objects[i];
+        var cx = (o.x / CELL) | 0;
+        var cy = (o.y / CELL) | 0;
+        var key = cx + ',' + cy;
+        if (!this._objGrid[key]) this._objGrid[key] = [];
+        this._objGrid[key].push(o);
+        if (o.type === 'campfire') this._campfires.push(o);
+        if (o.type === 'shrine' || o.type === 'curse_shrine') this._shrines.push(o);
+    }
+};
+
+TWB.Game.prototype._addToGrid = function(o) {
+    var cx = (o.x / this._gridCell) | 0;
+    var cy = (o.y / this._gridCell) | 0;
+    var key = cx + ',' + cy;
+    if (!this._objGrid[key]) this._objGrid[key] = [];
+    this._objGrid[key].push(o);
+    if (o.type === 'campfire') this._campfires.push(o);
+    if (o.type === 'shrine' || o.type === 'curse_shrine') this._shrines.push(o);
+};
+
+TWB.Game.prototype._removeFromGrid = function(o) {
+    var cx = (o.x / this._gridCell) | 0;
+    var cy = (o.y / this._gridCell) | 0;
+    var key = cx + ',' + cy;
+    var cell = this._objGrid[key];
+    if (cell) {
+        var idx = cell.indexOf(o);
+        if (idx >= 0) cell.splice(idx, 1);
+    }
+    if (o.type === 'campfire') {
+        var ci = this._campfires.indexOf(o);
+        if (ci >= 0) this._campfires.splice(ci, 1);
+    }
+    if (o.type === 'shrine' || o.type === 'curse_shrine') {
+        var si = this._shrines.indexOf(o);
+        if (si >= 0) this._shrines.splice(si, 1);
+    }
+};
+
+TWB.Game.prototype._getVisibleObjects = function(margin) {
+    var cam = this.camera;
+    var CELL = this._gridCell;
+    var x0 = ((cam.x - margin) / CELL) | 0;
+    var y0 = ((cam.y - margin) / CELL) | 0;
+    var x1 = ((cam.x + this.canvas.width + margin) / CELL) | 0;
+    var y1 = ((cam.y + this.canvas.height + margin) / CELL) | 0;
+    var result = [];
+    for (var gx = x0; gx <= x1; gx++) {
+        for (var gy = y0; gy <= y1; gy++) {
+            var cell = this._objGrid[gx + ',' + gy];
+            if (!cell) continue;
+            for (var i = 0; i < cell.length; i++) {
+                var o = cell[i];
+                if (o.x > cam.x - margin && o.x < cam.x + this.canvas.width + margin &&
+                    o.y > cam.y - margin && o.y < cam.y + this.canvas.height + margin) {
+                    result.push(o);
+                }
+            }
+        }
+    }
+    return result;
+};
+
+TWB.Game.prototype._getObjectsNear = function(wx, wy, radius) {
+    var CELL = this._gridCell;
+    var x0 = ((wx - radius) / CELL) | 0;
+    var y0 = ((wy - radius) / CELL) | 0;
+    var x1 = ((wx + radius) / CELL) | 0;
+    var y1 = ((wy + radius) / CELL) | 0;
+    var result = [];
+    for (var gx = x0; gx <= x1; gx++) {
+        for (var gy = y0; gy <= y1; gy++) {
+            var cell = this._objGrid[gx + ',' + gy];
+            if (cell) for (var i = 0; i < cell.length; i++) result.push(cell[i]);
+        }
+    }
+    return result;
 };
 
 TWB.Game.prototype.setupInput = function() {
@@ -1036,7 +1127,7 @@ TWB.Game.prototype.setupInput = function() {
             self.player.tx = self.player.x; self.player.ty = self.player.y; self.player.moving = false;
             self.wolf.x = self.player.x + 30; self.wolf.y = self.player.y;
             self.wolf.tx = self.wolf.x; self.wolf.ty = self.wolf.y;
-            if (self.indoors) { self.indoors = false; TWB.indoors = false; if (self.outdoorState) { self.objects = self.outdoorState.objects; } }
+            if (self.indoors) { self.indoors = false; TWB.indoors = false; if (self.outdoorState) { self.objects = self.outdoorState.objects; } self._buildObjectGrid(); }
             self.notify('CHEAT: Rescue ready. Click the cabin.');
         },
         'relay': function() {
@@ -1049,7 +1140,7 @@ TWB.Game.prototype.setupInput = function() {
             self.player.tx = self.player.x; self.player.ty = self.player.y; self.player.moving = false;
             self.wolf.x = self.player.x + 30; self.wolf.y = self.player.y;
             self.wolf.tx = self.wolf.x; self.wolf.ty = self.wolf.y;
-            if (self.indoors) { self.indoors = false; TWB.indoors = false; if (self.outdoorState) { self.objects = self.outdoorState.objects; } }
+            if (self.indoors) { self.indoors = false; TWB.indoors = false; if (self.outdoorState) { self.objects = self.outdoorState.objects; } self._buildObjectGrid(); }
             self.notify('CHEAT: Relay ready. Click the cabin.');
         },
         'curse': function() {
@@ -1060,7 +1151,7 @@ TWB.Game.prototype.setupInput = function() {
             self.player.tx = self.player.x; self.player.ty = self.player.y; self.player.moving = false;
             self.wolf.x = self.player.x + 30; self.wolf.y = self.player.y;
             self.wolf.tx = self.wolf.x; self.wolf.ty = self.wolf.y;
-            if (self.indoors) { self.indoors = false; TWB.indoors = false; if (self.outdoorState) { self.objects = self.outdoorState.objects; } }
+            if (self.indoors) { self.indoors = false; TWB.indoors = false; if (self.outdoorState) { self.objects = self.outdoorState.objects; } self._buildObjectGrid(); }
             self.notify('CHEAT: Curse ready. Click the cabin.');
         },
         'rain': function() {
@@ -1221,14 +1312,14 @@ TWB.Game.prototype.setupInput = function() {
             }
             if (cb.slice(-5) === 'quest') {
                 if (self.questPhase === 0 && !self.dogStolen && !self.dogRescued) {
-                    var shrineIndices = [];
-                    for (var qi = 0; qi < self.objects.length; qi++) {
-                        if (self.objects[qi].type === 'shrine') shrineIndices.push(qi);
+                    var shrineObjs = [];
+                    for (var qi = 0; qi < self._shrines.length; qi++) {
+                        if (self._shrines[qi].type === 'shrine') shrineObjs.push(self._shrines[qi]);
                     }
                     self.questShrines = [];
-                    while (self.questShrines.length < 3 && shrineIndices.length > 0) {
-                        var ri = Math.floor(Math.random() * shrineIndices.length);
-                        self.questShrines.push(shrineIndices.splice(ri, 1)[0]);
+                    while (self.questShrines.length < 3 && shrineObjs.length > 0) {
+                        var ri = Math.floor(Math.random() * shrineObjs.length);
+                        self.questShrines.push(shrineObjs.splice(ri, 1)[0]);
                     }
                     var farCabin = 0, farDist = 0;
                     for (var fi = 0; fi < TWB._cabinData.length; fi++) {
@@ -1382,7 +1473,9 @@ TWB.Game.prototype.setupInput = function() {
                 self.cheatBuffer = '';
             }
             if (cb.slice(-6) === 'spring') {
-                self.objects.push({ type: 'fountain', x: self.player.x, y: self.player.y + 80, solid: true, colR: 12 });
+                var _fo = { type: 'fountain', x: self.player.x, y: self.player.y + 80, solid: true, colR: 12 };
+                self.objects.push(_fo);
+                self._addToGrid(_fo);
                 self.notify('A spring appears nearby...');
                 self.cheatBuffer = '';
             }
@@ -1481,8 +1574,18 @@ TWB.Game.prototype.setupInput = function() {
                 self.craftingOpen = false;
                 self.cheatBuffer = '';
             }
+            if (cb.slice(-3) === 'fps') {
+                self._showFPS = !self._showFPS;
+                if (self._showFPS) {
+                    self._fpsFrames = 0;
+                    self._fpsLast = performance.now();
+                    self._fpsVal = 0;
+                }
+                self.notify(self._showFPS ? 'FPS ON' : 'FPS OFF');
+                self.cheatBuffer = '';
+            }
             if (cb.slice(-5) === 'codes') {
-                self.notify('night day starve feed rest shadow quest rescue easy hard normal ghost torch curse debt mystery elder snow where', TWB.NOTIFY_XLNG);
+                self.notify('night day starve feed rest shadow quest rescue easy hard normal ghost torch curse debt mystery elder snow where fps', TWB.NOTIFY_XLNG);
                 self.cheatBuffer = '';
             }
         }
@@ -1492,8 +1595,9 @@ TWB.Game.prototype.setupInput = function() {
 TWB.Game.prototype.findObjectAt = function(wx, wy) {
     var best = null;
     var bestDist = Infinity;
-    for (var i = 0; i < this.objects.length; i++) {
-        var obj = this.objects[i];
+    var nearby = this._objGrid ? this._getObjectsNear(wx, wy, 100) : this.objects;
+    for (var i = 0; i < nearby.length; i++) {
+        var obj = nearby[i];
         if (!TWB.ACTIONS[obj.type]) continue;
         if (obj.type === 'herb_vikos' && obj.picked) continue;
         var d = TWB.dist(wx, wy, obj.x, obj.y);
@@ -1613,9 +1717,11 @@ TWB.Game.prototype.addToBackpack = function(type, count) {
     for (var i = 0; i < this.backpack.length; i++) {
         if (this.backpack[i] && this.backpack[i].type === type) {
             var canAdd = Math.min(count, maxStack - this.backpack[i].count);
-            if (canAdd <= 0) return false;
-            this.backpack[i].count += canAdd;
-            return true;
+            if (canAdd > 0) {
+                this.backpack[i].count += canAdd;
+                return true;
+            }
+            break;
         }
     }
     for (var i = 0; i < this.backpack.length; i++) {
@@ -1858,6 +1964,7 @@ TWB.Game.prototype.executeAction = function(obj, action) {
         case 'chop':
             if (s.energy < 10) { msg = TWB.MSG_TIRED; break; }
             if (!this.addToBackpack('wood', 1)) { msg = TWB.MSG_FULL; break; }
+            this._removeFromGrid(obj);
             var idx = this.objects.indexOf(obj);
             if (idx >= 0) this.objects.splice(idx, 1);
             s.energy = Math.max(0, s.energy - 12);
@@ -1875,6 +1982,7 @@ TWB.Game.prototype.executeAction = function(obj, action) {
         case 'mine':
             if (s.energy < 10) { msg = TWB.MSG_TIRED; break; }
             if (!this.addToBackpack('stone', 1)) { msg = TWB.MSG_FULL; break; }
+            this._removeFromGrid(obj);
             var idx2 = this.objects.indexOf(obj);
             if (idx2 >= 0) this.objects.splice(idx2, 1);
             s.energy = Math.max(0, s.energy - 15);
@@ -1892,12 +2000,13 @@ TWB.Game.prototype.executeAction = function(obj, action) {
             if (obj.hits >= 3) {
                 var added = this.addToBackpack('stone', 3);
                 if (!added) { msg = TWB.MSG_FULL; obj.hits--; break; }
+                this._removeFromGrid(obj);
                 var idx3 = this.objects.indexOf(obj);
                 if (idx3 >= 0) this.objects.splice(idx3, 1);
                 this._mapCanvas = null;
                 msg = '+3 Stone (boulder destroyed)';
             } else {
-                this.addToBackpack('stone', 1);
+                if (!this.addToBackpack('stone', 1)) { msg = TWB.MSG_FULL; obj.hits--; break; }
                 msg = '+1 Stone (hit ' + obj.hits + '/3)';
             }
             break;
@@ -2246,25 +2355,32 @@ TWB.Game.prototype.executeAction = function(obj, action) {
             }
             break;
         case 'pickup_trap':
-            if (!this.addToBackpack('trap', 1)) { msg = TWB.MSG_FULL; break; }
             if (obj.caught) {
-                this.addToBackpack('meat', obj.caught.meat);
+                if (!this.addToBackpack('meat', obj.caught.meat)) { msg = TWB.MSG_FULL; break; }
+                if (!this.addToBackpack('trap', 1)) {
+                    this.removeFromBackpack('meat', obj.caught.meat);
+                    msg = TWB.MSG_FULL; break;
+                }
                 msg = 'Picked up trap (+' + obj.caught.name + ')';
             } else {
+                if (!this.addToBackpack('trap', 1)) { msg = TWB.MSG_FULL; break; }
                 msg = 'Picked up trap';
             }
+            this._removeFromGrid(obj);
             var ti = this.objects.indexOf(obj);
             if (ti >= 0) this.objects.splice(ti, 1);
             break;
         case 'pickup_shepherd_wool':
             if (!this.addToBackpack('shepherd_wool', 1)) { msg = TWB.MSG_FULL; break; }
             msg = this.shepherdQuotes[Math.floor(Math.random() * this.shepherdQuotes.length)];
+            this._removeFromGrid(obj);
             var swi = this.objects.indexOf(obj);
             if (swi >= 0) this.objects.splice(swi, 1);
             break;
         case 'pickup_shepherd_bell':
             if (!this.addToBackpack('shepherd_bell', 1)) { msg = TWB.MSG_FULL; break; }
             msg = this.shepherdQuotes[Math.floor(Math.random() * this.shepherdQuotes.length)];
+            this._removeFromGrid(obj);
             var sbi = this.objects.indexOf(obj);
             if (sbi >= 0) this.objects.splice(sbi, 1);
             break;
@@ -2316,7 +2432,9 @@ TWB.Game.prototype.executeAction = function(obj, action) {
         case 'place_trap':
             if (this.getItemCount('trap') > 0) {
                 this.removeFromBackpack('trap', 1);
-                this.objects.push({ type: 'trap', x: obj.x, y: obj.y, solid: false, caught: null, timer: 0 });
+                var trapObj = { type: 'trap', x: obj.x, y: obj.y, solid: false, caught: null, timer: 0 };
+                this.objects.push(trapObj);
+                this._addToGrid(trapObj);
                 msg = 'Trap placed';
             }
             break;
@@ -2324,11 +2442,15 @@ TWB.Game.prototype.executeAction = function(obj, action) {
             if (this.getItemCount('lighter') < 1) { msg = 'Need a lighter!'; break; }
             if (this.getItemCount('wood') > 0) {
                 this.removeFromBackpack('wood', 1);
-                this.objects.push({ type: 'campfire', x: obj.x, y: obj.y, solid: true, colR: 10, tempFuel: 60 });
+                var fireObj1 = { type: 'campfire', x: obj.x, y: obj.y, solid: true, colR: 10, tempFuel: 60 };
+                this.objects.push(fireObj1);
+                this._addToGrid(fireObj1);
                 msg = 'Lit a fire!';
             } else if (this.getItemCount('sticks') > 0) {
                 this.removeFromBackpack('sticks', 1);
-                this.objects.push({ type: 'campfire', x: obj.x, y: obj.y, solid: true, colR: 10, tempFuel: 30 });
+                var fireObj2 = { type: 'campfire', x: obj.x, y: obj.y, solid: true, colR: 10, tempFuel: 30 };
+                this.objects.push(fireObj2);
+                this._addToGrid(fireObj2);
                 msg = 'Lit a small fire!';
             }
             break;
@@ -2415,7 +2537,7 @@ TWB.Game.prototype.executeAction = function(obj, action) {
             break;
         case 'pray_shrine':
             if (!obj.lit) { msg = 'The shrine is cold and dark...'; break; }
-            var curHour = Math.floor(this.gameTime / 60);
+            var curHour = Math.floor(this.gameTime / 3600);
             if (this._lastPrayHour !== undefined && curHour - this._lastPrayHour < 1) {
                 msg = 'You need to wait before praying again.';
                 break;
@@ -2680,10 +2802,14 @@ TWB.Game.prototype.enterCabin = function() {
     this.currentCabinIdx = nearestIdx;
     this.outdoorState = {
         objects: this.objects,
+        objGrid: this._objGrid,
+        campfires: this._campfires,
+        shrines: this._shrines,
         px: this.player.x, py: this.player.y,
         wx: this.wolf.x, wy: this.wolf.y
     };
     this.objects = TWB.buildCabinInterior(nearestIdx);
+    this._buildObjectGrid();
     this.player.x = 4 * 32;
     this.player.y = 3 * 32;
     this.player.tx = this.player.x;
@@ -2728,6 +2854,9 @@ TWB.Game.prototype.enterCabin = function() {
 TWB.Game.prototype.exitCabin = function() {
     var st = this.outdoorState;
     this.objects = st.objects;
+    this._objGrid = st.objGrid;
+    this._campfires = st.campfires;
+    this._shrines = st.shrines;
     this.player.x = st.px;
     this.player.y = st.py;
     this.player.tx = st.px;
@@ -2836,7 +2965,8 @@ TWB.Game.prototype.update = function() {
             this.fishing = null;
         }
     } else {
-        this.player.update(this.objects);
+        var nearPlayer = this._objGrid ? this._getObjectsNear(this.player.x, this.player.y, 60) : this.objects;
+        this.player.update(nearPlayer);
     }
     if (this.player.moving) {
         this.runStats.distWalked += this.player.speed / TWB.TILE;
@@ -2858,9 +2988,9 @@ TWB.Game.prototype.update = function() {
     if (this.indoors && this.fireplaceFuel > 0) {
         fireVol = 0.5;
     }
-    for (var fi = 0; fi < this.objects.length; fi++) {
-        var fo = this.objects[fi];
-        if (fo.type !== 'campfire' && fo.type !== 'fireplace') continue;
+    var fireList = this._campfires || [];
+    for (var fi = 0; fi < fireList.length; fi++) {
+        var fo = fireList[fi];
         var fFuel = fo.tempFuel !== undefined ? fo.tempFuel : this.fireFuel;
         if (fFuel <= 0) continue;
         var fDist = TWB.dist(this.player.x, this.player.y, fo.x, fo.y);
@@ -2874,10 +3004,12 @@ TWB.Game.prototype.update = function() {
     if (this.fleeing) {
         var cabin = null;
         var bestCabDist = Infinity;
-        for (var ci = 0; ci < this.objects.length; ci++) {
-            if (this.objects[ci].type === 'cabin') {
-                var cd = TWB.dist(this.player.x, this.player.y, this.objects[ci].x, this.objects[ci].y);
-                if (cd < bestCabDist) { bestCabDist = cd; cabin = this.objects[ci]; }
+        for (var ci = 0; ci < TWB._cabinData.length; ci++) {
+            var cdat = TWB._cabinData[ci];
+            var cd = TWB.dist(this.player.x, this.player.y, cdat.cx * TWB.TILE, cdat.cy * TWB.TILE);
+            if (cd < bestCabDist) {
+                bestCabDist = cd;
+                cabin = { x: cdat.cx * TWB.TILE, y: cdat.cy * TWB.TILE };
             }
         }
         if (cabin) {
@@ -2916,7 +3048,7 @@ TWB.Game.prototype.update = function() {
         } else {
             this.wolf.setTarget(prey.x, prey.y);
         }
-        this.wolf.update(this.objects);
+        this.wolf.update(this._objGrid ? this._getObjectsNear(this.wolf.x, this.wolf.y, 60) : this.objects);
     } else if (this.predator) {
         var pdx = this.predator.x - this.wolf.x;
         var pdy = this.predator.y - this.wolf.y;
@@ -2927,12 +3059,12 @@ TWB.Game.prototype.update = function() {
             this.wolf.moving = false;
             this.wolf.dir = Math.abs(pdx) > Math.abs(pdy) ? (pdx > 0 ? 3 : 2) : (pdy > 0 ? 0 : 1);
         }
-        this.wolf.update(this.objects);
+        this.wolf.update(this._objGrid ? this._getObjectsNear(this.wolf.x, this.wolf.y, 60) : this.objects);
 
         var nearShrine = false;
-        for (var psi = 0; psi < this.objects.length; psi++) {
-            var ps = this.objects[psi];
-            if ((ps.type !== 'shrine' && ps.type !== 'curse_shrine') || !ps.lit) continue;
+        for (var psi = 0; psi < this._shrines.length; psi++) {
+            var ps = this._shrines[psi];
+            if (!ps.lit) continue;
             if (TWB.dist(this.predator.x, this.predator.y, ps.x, ps.y) < 120) { nearShrine = true; break; }
         }
         if (nearShrine) {
@@ -3050,7 +3182,7 @@ TWB.Game.prototype.update = function() {
                 this.wolf.ty = this.wolf.y;
             }
         }
-        this.wolf.update(this.objects);
+        this.wolf.update(this._objGrid ? this._getObjectsNear(this.wolf.x, this.wolf.y, 60) : this.objects);
     }
 
     if (this.indoors) {
@@ -3080,18 +3212,24 @@ TWB.Game.prototype.update = function() {
     }
     var nightBurnRate = this.nightActive ? 0.06 : 0.02;
     if (this.raining && !this.indoors) nightBurnRate *= 3;
-    for (var tfi = this.objects.length - 1; tfi >= 0; tfi--) {
-        if (this.objects[tfi].tempFuel !== undefined) {
-            this.objects[tfi].tempFuel -= nightBurnRate;
-            if (this.objects[tfi].tempFuel <= 0) {
-                this.objects.splice(tfi, 1);
+    for (var tfi = this._campfires.length - 1; tfi >= 0; tfi--) {
+        var cf = this._campfires[tfi];
+        if (cf.tempFuel !== undefined) {
+            cf.tempFuel -= nightBurnRate;
+            if (cf.tempFuel <= 0) {
+                this._removeFromGrid(cf);
+                var cfIdx = this.objects.indexOf(cf);
+                if (cfIdx >= 0) this.objects.splice(cfIdx, 1);
             }
         }
-        if (this.objects[tfi] && this.objects[tfi].type === 'shrine' && this.objects[tfi].lit) {
-            this.objects[tfi].litFuel -= 0.01;
-            if (this.objects[tfi].litFuel <= 0) {
-                this.objects[tfi].lit = false;
-                this.objects[tfi].litFuel = 0;
+    }
+    for (var tsi = 0; tsi < this._shrines.length; tsi++) {
+        var sh = this._shrines[tsi];
+        if (sh.lit) {
+            sh.litFuel -= 0.01;
+            if (sh.litFuel <= 0) {
+                sh.lit = false;
+                sh.litFuel = 0;
                 this._mapCanvas = null;
             }
         }
@@ -3305,8 +3443,10 @@ TWB.Game.prototype.update = function() {
                 this.shepherdDone = true;
                 var smItemX = this.player.x + (Math.random() - 0.5) * 60;
                 var smItemY = this.player.y + 40 + Math.random() * 40;
-                this.objects.push({ type: 'shepherd_wool', x: smItemX + 20 + Math.random() * 30, y: smItemY + 10 + Math.random() * 20, solid: false });
-                this.objects.push({ type: 'shepherd_bell', x: smItemX - 10 + Math.random() * 20, y: smItemY + 30 + Math.random() * 20, solid: false });
+                var woolObj = { type: 'shepherd_wool', x: smItemX + 20 + Math.random() * 30, y: smItemY + 10 + Math.random() * 20, solid: false };
+                var bellObj = { type: 'shepherd_bell', x: smItemX - 10 + Math.random() * 20, y: smItemY + 30 + Math.random() * 20, solid: false };
+                this.objects.push(woolObj); this._addToGrid(woolObj);
+                this.objects.push(bellObj); this._addToGrid(bellObj);
                 if (!this.dogStolen) {
                     this.wolf.tx = smItemX + 15;
                     this.wolf.ty = smItemY + 15;
@@ -3446,12 +3586,10 @@ TWB.Game.prototype.update = function() {
             }
 
             if (this.fireBuff > 0) {
-                for (var cfi = 0; cfi < this.objects.length; cfi++) {
-                    var cf = this.objects[cfi];
-                    if (cf.type === 'campfire' && cf.tempFuel > 0) {
-                        if (TWB.dist(sh.x, sh.y, cf.x, cf.y) < 200) {
-                            sh.retreatTimer = 60;
-                        }
+                for (var cfi = 0; cfi < this._campfires.length; cfi++) {
+                    var cf = this._campfires[cfi];
+                    if (cf.tempFuel > 0 && TWB.dist(sh.x, sh.y, cf.x, cf.y) < 200) {
+                        sh.retreatTimer = 60;
                     }
                 }
             }
@@ -3779,12 +3917,12 @@ TWB.Game.prototype.update = function() {
                 this.questTimer = 0;
                 this.wolfHunting = null;
                 this.dogSense = null;
-                var shrines = [];
-                for (var qsi = 0; qsi < this.objects.length; qsi++) {
-                    if (this.objects[qsi].type === 'shrine') shrines.push(qsi);
+                var shrineRefs = [];
+                for (var qsi = 0; qsi < this._shrines.length; qsi++) {
+                    if (this._shrines[qsi].type === 'shrine') shrineRefs.push(this._shrines[qsi]);
                 }
                 this.questShrines = [];
-                var shuffled = shrines.slice();
+                var shuffled = shrineRefs.slice();
                 for (var qi = shuffled.length - 1; qi > 0; qi--) {
                     var qj = Math.floor(Math.random() * (qi + 1));
                     var tmp = shuffled[qi]; shuffled[qi] = shuffled[qj]; shuffled[qj] = tmp;
@@ -3814,7 +3952,7 @@ TWB.Game.prototype.update = function() {
         if (this.questPhase === 1) {
             var litCount = 0;
             for (var qci = 0; qci < this.questShrines.length; qci++) {
-                var qs = this.objects[this.questShrines[qci]];
+                var qs = this.questShrines[qci];
                 if (qs && qs.lit) litCount++;
             }
             if (litCount > this.questShrinesLit) {
@@ -4101,17 +4239,19 @@ TWB.Game.prototype.update = function() {
                     var ng = TWB.getGround(ntx, nty);
                     if (ng === TWB.T_WATER || ng === TWB.T_SHORE) continue;
                     var isPine = Math.random() > 0.33;
-                    this.objects.push({
+                    var newTree = {
                         type: isPine ? 'tree_pine' : 'tree_oak',
                         x: ntx * TWB.TILE + Math.floor(Math.random() * 16) - 8,
                         y: nty * TWB.TILE + Math.floor(Math.random() * 16) - 8,
                         solid: true, colR: 6
-                    });
+                    };
+                    this.objects.push(newTree);
+                    this._addToGrid(newTree);
                 }
             }
         } else {
             var hour = this.getGameHour();
-            if (hour >= 6 && hour < 22) {
+            if (hour >= 6 && hour < 22 && !this.snowing) {
                 this.raining = true;
                 this.rainTimer = 1800 + Math.floor(Math.random() * 5400);
                 this.runStats.storms++;
@@ -4137,7 +4277,8 @@ TWB.Game.prototype.update = function() {
             this.notify('The snow stopped.');
         } else if (!this.raining) {
             var sHour = this.getGameHour();
-            if (sHour >= 0 && sHour < 6 || sHour >= 16) {
+            var sTemp = this.getTemperature();
+            if ((sHour >= 0 && sHour < 6 || sHour >= 16) && sTemp <= 0) {
                 this.snowing = true;
                 this.snowTimer = 2700 + Math.floor(Math.random() * 7200);
                 this.runStats.storms++;
@@ -4219,9 +4360,9 @@ TWB.Game.prototype.update = function() {
             this.fireplaceFuel = 0;
             if (!this.notification) this.notify('The fire went out...');
         }
-        if (this.cursedDogStopped || true) {
+        if (this.cursedDogStopped) {
             this.wolf.x = 6 * 32;
-            this.wolf.y = 8 * 32;
+            this.wolf.y = 4 * 32;
             this.wolf.tx = this.wolf.x;
             this.wolf.ty = this.wolf.y;
             this.wolf.moving = false;
@@ -4256,6 +4397,20 @@ TWB.Game.prototype.update = function() {
             if (this.gameTime % 120 === 0) {
                 this.stats.health = Math.max(0, this.stats.health - 0.2 * Math.floor(this.shadowTrails[ptKey]));
             }
+        }
+    }
+
+    if (this.gameTime % 1800 === 0) {
+        var _px = Math.floor(this.player.x / TWB.TILE);
+        var _py = Math.floor(this.player.y / TWB.TILE);
+        var _r = 40;
+        for (var _sk in this.shadowTrails) {
+            var _sp = _sk.split(',');
+            if (Math.abs(+_sp[0] - _px) > _r || Math.abs(+_sp[1] - _py) > _r) delete this.shadowTrails[_sk];
+        }
+        for (var _ak in this.snowAccum) {
+            var _ap = _ak.split(',');
+            if (Math.abs(+_ap[0] - _px) > _r || Math.abs(+_ap[1] - _py) > _r) delete this.snowAccum[_ak];
         }
     }
 
@@ -4403,25 +4558,32 @@ TWB.Game.prototype.render = function() {
         var ec = Math.ceil((cam.x + this.canvas.width) / TWB.TILE) + 1;
         var er = Math.ceil((cam.y + this.canvas.height) / TWB.TILE) + 1;
 
+        var hasTrails = false;
+        for (var _k in this.shadowTrails) { hasTrails = true; break; }
+        var hasSnow = false;
+        for (var _k2 in this.snowAccum) { hasSnow = true; break; }
         for (var ty = sr; ty <= er; ty++) {
             for (var tx = sc; tx <= ec; tx++) {
                 if (tx < 0 || ty < 0 || tx >= TWB.COLS || ty >= TWB.ROWS) continue;
                 var tile = TWB.getGround(tx, ty);
                 var sprite = TWB.Sprites.ground[tile];
+                var px = Math.floor(tx * TWB.TILE - cam.x);
+                var py = Math.floor(ty * TWB.TILE - cam.y);
                 if (sprite) {
-                    ctx.drawImage(sprite, Math.floor(tx * TWB.TILE - cam.x), Math.floor(ty * TWB.TILE - cam.y));
+                    ctx.drawImage(sprite, px, py);
                 }
-                var trailKey = tx + ',' + ty;
-                if (this.shadowTrails[trailKey]) {
-                    var trailAlpha = Math.min(0.6, this.shadowTrails[trailKey] * 0.12);
-                    ctx.fillStyle = 'rgba(5,0,15,' + trailAlpha.toFixed(2) + ')';
-                    ctx.fillRect(Math.floor(tx * TWB.TILE - cam.x), Math.floor(ty * TWB.TILE - cam.y), TWB.TILE, TWB.TILE);
-                }
-                var snowKey = tx + ',' + ty;
-                if (this.snowAccum[snowKey]) {
-                    var sa = this.snowAccum[snowKey];
-                    ctx.fillStyle = 'rgba(210,210,220,' + (sa * 0.7).toFixed(2) + ')';
-                    ctx.fillRect(Math.floor(tx * TWB.TILE - cam.x), Math.floor(ty * TWB.TILE - cam.y), TWB.TILE, TWB.TILE);
+                if (hasTrails || hasSnow) {
+                    var tileKey = tx + ',' + ty;
+                    if (hasTrails && this.shadowTrails[tileKey]) {
+                        var trailAlpha = Math.min(0.6, this.shadowTrails[tileKey] * 0.12);
+                        ctx.fillStyle = 'rgba(5,0,15,' + trailAlpha.toFixed(2) + ')';
+                        ctx.fillRect(px, py, TWB.TILE, TWB.TILE);
+                    }
+                    if (hasSnow && this.snowAccum[tileKey]) {
+                        var sa = this.snowAccum[tileKey];
+                        ctx.fillStyle = 'rgba(210,210,220,' + (sa * 0.7).toFixed(2) + ')';
+                        ctx.fillRect(px, py, TWB.TILE, TWB.TILE);
+                    }
                 }
             }
         }
@@ -4442,12 +4604,10 @@ TWB.Game.prototype.render = function() {
 
     var renderList = [];
 
-    for (var i = 0; i < this.objects.length; i++) {
-        var obj = this.objects[i];
-        if (obj.x > cam.x - 100 && obj.x < cam.x + this.canvas.width + 100 &&
-            obj.y > cam.y - 100 && obj.y < cam.y + this.canvas.height + 100) {
-            renderList.push({ kind: 'obj', data: obj, sortY: obj.y });
-        }
+    var visObjs = this._objGrid ? this._getVisibleObjects(100) : this.objects;
+    for (var i = 0; i < visObjs.length; i++) {
+        var obj = visObjs[i];
+        renderList.push({ kind: 'obj', data: obj, sortY: obj.y });
     }
 
     renderList.push({ kind: 'player', sortY: this.player.y });
@@ -4549,6 +4709,47 @@ TWB.Game.prototype.render = function() {
     if (this.dead) this.drawDeath();
     this.drawTutorial();
     if (this.missionBrief) this.drawMissionBrief();
+    if (this._showFPS) {
+        this._fpsFrames++;
+        var now = performance.now();
+        if (now - this._fpsLast >= 1000) {
+            this._fpsVal = this._fpsFrames;
+            this._fpsFrames = 0;
+            this._fpsLast = now;
+        }
+        var ctx = this.ctx;
+        ctx.font = '12px monospace';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'top';
+        ctx.fillStyle = '#000';
+        ctx.fillRect(this.canvas.width - 52, 30, 50, 16);
+        ctx.fillStyle = this._fpsVal >= 50 ? '#0f0' : this._fpsVal >= 30 ? '#ff0' : '#f00';
+        ctx.fillText('FPS: ' + this._fpsVal, this.canvas.width - 4, 32);
+    }
+};
+
+TWB.Game.prototype._getStaticNoise = function(w, purple) {
+    var key = purple ? '_staticNoisePurple' : '_staticNoise';
+    if (!this[key] || this[key].width !== w) {
+        var c = document.createElement('canvas');
+        c.width = w; c.height = 40;
+        var nc = c.getContext('2d');
+        var sd = nc.createImageData(w, 40);
+        var px = sd.data;
+        for (var i = 0; i < px.length; i += 4) {
+            if (purple) {
+                var v = Math.floor(Math.random() * 40);
+                px[i] = v; px[i+1] = 0; px[i+2] = v + 10;
+            } else {
+                var v2 = Math.floor(Math.random() * 60);
+                px[i] = v2; px[i+1] = v2; px[i+2] = v2;
+            }
+            px[i+3] = 255;
+        }
+        nc.putImageData(sd, 0, 0);
+        this[key] = c;
+    }
+    return this[key];
 };
 
 TWB.Game.prototype.drawShepherdCutscene = function() {
@@ -4598,13 +4799,8 @@ TWB.Game.prototype.drawShepherdCutscene = function() {
     if (progress < 1) {
         var staticH = Math.min(40, ch - scanY);
         if (staticH > 0) {
-            var sd = ctx.getImageData(0, scanY, cw, staticH);
-            var px = sd.data;
-            for (var i = 0; i < px.length; i += 4) {
-                var v = Math.floor(Math.random() * 60);
-                px[i] = v; px[i+1] = v; px[i+2] = v; px[i+3] = 255;
-            }
-            ctx.putImageData(sd, 0, scanY);
+            var nc = this._getStaticNoise(cw, false);
+            ctx.drawImage(nc, 0, 0, cw, staticH, 0, scanY, cw, staticH);
         }
     }
 
@@ -4710,13 +4906,8 @@ TWB.Game.prototype.drawWinCutscene = function() {
     if (progress < 1) {
         var staticH = Math.min(40, ch - scanY);
         if (staticH > 0) {
-            var sd2 = ctx.getImageData(0, scanY, cw, staticH);
-            var px = sd2.data;
-            for (var i = 0; i < px.length; i += 4) {
-                var v = Math.floor(Math.random() * 60);
-                px[i] = v; px[i+1] = v; px[i+2] = v; px[i+3] = 255;
-            }
-            ctx.putImageData(sd2, 0, scanY);
+            var nc2 = this._getStaticNoise(cw, false);
+            ctx.drawImage(nc2, 0, 0, cw, staticH, 0, scanY, cw, staticH);
         }
     }
 
@@ -4839,13 +5030,8 @@ TWB.Game.prototype.drawDoorKnockCutscene = function() {
     if (progress < 1) {
         var staticH = Math.min(40, ch - scanY);
         if (staticH > 0) {
-            var sd = ctx.getImageData(0, scanY, cw, staticH);
-            var px = sd.data;
-            for (var i = 0; i < px.length; i += 4) {
-                var v = Math.floor(Math.random() * 60);
-                px[i] = v; px[i+1] = v; px[i+2] = v; px[i+3] = 255;
-            }
-            ctx.putImageData(sd, 0, scanY);
+            var nc3 = this._getStaticNoise(cw, false);
+            ctx.drawImage(nc3, 0, 0, cw, staticH, 0, scanY, cw, staticH);
         }
     }
 
@@ -5118,16 +5304,16 @@ TWB.Game.prototype.drawFire = function() {
     var ctx = this.ctx;
     var t = this.fireTime;
 
-    for (var oi = 0; oi < this.objects.length; oi++) {
-        var obj = this.objects[oi];
-        var fuel = 0;
-        if (obj.type === 'campfire') {
-            fuel = obj.tempFuel !== undefined ? obj.tempFuel : this.fireFuel;
-        } else if (obj.type === 'fireplace') {
-            fuel = this.fireplaceFuel;
-        } else {
-            continue;
+    var fireObjs = this._campfires || [];
+    if (this.indoors) {
+        fireObjs = [];
+        for (var foi = 0; foi < this.objects.length; foi++) {
+            if (this.objects[foi].type === 'campfire' || this.objects[foi].type === 'fireplace') fireObjs.push(this.objects[foi]);
         }
+    }
+    for (var oi = 0; oi < fireObjs.length; oi++) {
+        var obj = fireObjs[oi];
+        var fuel = obj.type === 'campfire' ? (obj.tempFuel !== undefined ? obj.tempFuel : this.fireFuel) : this.fireplaceFuel;
 
         var fx = Math.floor(obj.x - this.camera.x);
         var yOff = obj.type === 'fireplace' ? -4 : -8;
@@ -5188,9 +5374,9 @@ TWB.Game.prototype.drawFire = function() {
         ctx.textAlign = 'left';
     }
 
-    for (var si = 0; si < this.objects.length; si++) {
-        var shr = this.objects[si];
-        if ((shr.type !== 'shrine' && shr.type !== 'curse_shrine') || !shr.lit) continue;
+    for (var si = 0; si < this._shrines.length; si++) {
+        var shr = this._shrines[si];
+        if (!shr.lit) continue;
         var sx = Math.floor(shr.x - this.camera.x);
         var sy = Math.floor(shr.y - this.camera.y) - 16;
         if (sx < -100 || sx > this.canvas.width + 100 || sy < -100 || sy > this.canvas.height + 100) continue;
@@ -5227,7 +5413,12 @@ TWB.Game.prototype.getBaseTemperature = function() {
         return Math.round(peak - t * (peak - base));
     }
     if (hour >= 20 || hour < 4) {
-        var nightBase = -3 - Math.floor(Math.random() * 5);
+        var nightHourKey = Math.floor(hour);
+        if (this._nightTempHour !== nightHourKey) {
+            this._nightTempHour = nightHourKey;
+            this._nightTempRand = Math.floor(Math.random() * 5);
+        }
+        var nightBase = -3 - this._nightTempRand;
         if (this.nightType === 'freeze') nightBase -= 5;
         if (this.difficulty === 0) nightBase += 3;
         else if (this.difficulty === 2) nightBase -= 3;
@@ -5255,9 +5446,9 @@ TWB.Game.prototype.getTemperatureBreakdown = function() {
     var fire = 0;
     if (!this.indoors) {
         var bestFire = 0;
-        for (var i = 0; i < this.objects.length; i++) {
-            var o = this.objects[i];
-            if (o.type !== 'campfire' && o.type !== 'fireplace') continue;
+        var cfList = this._campfires || [];
+        for (var i = 0; i < cfList.length; i++) {
+            var o = cfList[i];
             var fuel = o.tempFuel !== undefined ? o.tempFuel : this.fireFuel;
             if (fuel <= 0) continue;
             var dist = TWB.dist(this.player.x, this.player.y, o.x, o.y);
@@ -5282,9 +5473,9 @@ TWB.Game.prototype.getTemperatureBreakdown = function() {
 
     var shrineWarmth = 0;
     if (!this.indoors) {
-        for (var swi = 0; swi < this.objects.length; swi++) {
-            var sw = this.objects[swi];
-            if ((sw.type !== 'shrine' && sw.type !== 'curse_shrine') || !sw.lit) continue;
+        for (var swi = 0; swi < this._shrines.length; swi++) {
+            var sw = this._shrines[swi];
+            if (!sw.lit) continue;
             if (TWB.dist(this.player.x, this.player.y, sw.x, sw.y) < 100) { shrineWarmth = 4; break; }
         }
     }
@@ -5338,39 +5529,46 @@ TWB.Game.prototype.drawCold = function() {
     var w = this.canvas.width;
     var h = this.canvas.height;
     var intensity = exposure.level / 4;
-
-    ctx.fillStyle = 'rgba(30,50,120,' + (intensity * 0.2) + ')';
-    ctx.fillRect(0, 0, w, h);
-
     var t = this.gameTime;
+
+    if (!this._coldInLighting) {
+        var blueA = intensity * 0.2;
+        if (exposure.level >= 3) blueA += 0.05 + Math.sin(t * 0.02) * 0.03;
+        ctx.fillStyle = 'rgba(30,50,120,' + blueA.toFixed(3) + ')';
+        ctx.fillRect(0, 0, w, h);
+    }
+
     var crystalCount = Math.floor(intensity * 16);
-    for (var i = 0; i < crystalCount; i++) {
-        var cx = (TWB.hash(i * 7 + Math.floor(t / 200), 888) % w);
-        var cy = (TWB.hash(888, i * 11 + Math.floor(t / 200)) % h);
-        var size = 2 + (TWB.hash(i, i) % 3);
+    if (crystalCount > 0) {
         var alpha = 0.15 + intensity * 0.25;
         ctx.strokeStyle = 'rgba(180,210,255,' + alpha + ')';
         ctx.lineWidth = 0.5;
         ctx.beginPath();
-        ctx.moveTo(cx - size, cy); ctx.lineTo(cx + size, cy);
-        ctx.moveTo(cx, cy - size); ctx.lineTo(cx, cy + size);
-        ctx.moveTo(cx - size * 0.7, cy - size * 0.7); ctx.lineTo(cx + size * 0.7, cy + size * 0.7);
-        ctx.moveTo(cx + size * 0.7, cy - size * 0.7); ctx.lineTo(cx - size * 0.7, cy + size * 0.7);
+        for (var i = 0; i < crystalCount; i++) {
+            var cx = (TWB.hash(i * 7 + Math.floor(t / 200), 888) % w);
+            var cy = (TWB.hash(888, i * 11 + Math.floor(t / 200)) % h);
+            var size = 2 + (TWB.hash(i, i) % 3);
+            ctx.moveTo(cx - size, cy); ctx.lineTo(cx + size, cy);
+            ctx.moveTo(cx, cy - size); ctx.lineTo(cx, cy + size);
+            ctx.moveTo(cx - size * 0.7, cy - size * 0.7); ctx.lineTo(cx + size * 0.7, cy + size * 0.7);
+            ctx.moveTo(cx + size * 0.7, cy - size * 0.7); ctx.lineTo(cx - size * 0.7, cy + size * 0.7);
+        }
         ctx.stroke();
     }
 
-    if (exposure.level >= 3) {
-        var pulseA = 0.05 + Math.sin(t * 0.02) * 0.03;
-        ctx.fillStyle = 'rgba(40,60,140,' + pulseA + ')';
+    if (!this._coldInLighting) {
+        if (this._coldVigLevel !== exposure.level || this._coldVigW !== w) {
+            this._coldVigLevel = exposure.level;
+            this._coldVigW = w;
+            var edgeAlpha = intensity * 0.35;
+            var grad = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.25, w / 2, h / 2, Math.max(w, h) * 0.65);
+            grad.addColorStop(0, 'rgba(100,150,220,0)');
+            grad.addColorStop(1, 'rgba(100,150,220,' + edgeAlpha + ')');
+            this._coldVigGrad = grad;
+        }
+        ctx.fillStyle = this._coldVigGrad;
         ctx.fillRect(0, 0, w, h);
     }
-
-    var edgeAlpha = intensity * 0.35;
-    var grad = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.25, w / 2, h / 2, Math.max(w, h) * 0.65);
-    grad.addColorStop(0, 'rgba(100,150,220,0)');
-    grad.addColorStop(1, 'rgba(100,150,220,' + edgeAlpha + ')');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, w, h);
 };
 
 TWB.Game.prototype.drawElder = function() {
@@ -5840,18 +6038,21 @@ TWB.Game.prototype.drawLighting = function() {
 
     if (overlayA < 0.02) {
         if (!this.indoors) {
-            var cx = w / 2, cy = h / 2;
-            var r = Math.max(w, h) * 0.6;
-            var vig = ctx.createRadialGradient(cx, cy, r * 0.5, cx, cy, r);
-            vig.addColorStop(0, 'rgba(0,0,0,0)');
-            vig.addColorStop(1, 'rgba(0,0,0,0.1)');
-            ctx.fillStyle = vig;
+            if (!this._dayVig || this._dayVigW !== w) {
+                this._dayVigW = w;
+                var cx = w / 2, cy = h / 2;
+                var r = Math.max(w, h) * 0.6;
+                this._dayVig = ctx.createRadialGradient(cx, cy, r * 0.5, cx, cy, r);
+                this._dayVig.addColorStop(0, 'rgba(0,0,0,0)');
+                this._dayVig.addColorStop(1, 'rgba(0,0,0,0.1)');
+            }
+            ctx.fillStyle = this._dayVig;
             ctx.fillRect(0, 0, w, h);
         }
         return;
     }
 
-    if (!this._lightCanvas) {
+    if (!this._lightCanvas || this._lightCanvas.width !== w || this._lightCanvas.height !== h) {
         this._lightCanvas = document.createElement('canvas');
         this._lightCanvas.width = w;
         this._lightCanvas.height = h;
@@ -5864,12 +6065,17 @@ TWB.Game.prototype.drawLighting = function() {
     lctx.fillRect(0, 0, w, h);
 
     var vigAlpha = this.indoors ? (hour < 6 || hour > 21 ? 0.4 : (hour < 8 || hour > 18 ? 0.15 : 0)) : (hour < 6 || hour > 21 ? 0.6 : (hour < 9 || hour > 18 ? 0.3 : 0.1));
-    var cx = w / 2, cy = h / 2;
-    var r = Math.max(w, h) * 0.6;
-    var vig = lctx.createRadialGradient(cx, cy, r * 0.5, cx, cy, r);
-    vig.addColorStop(0, 'rgba(0,0,0,0)');
-    vig.addColorStop(1, 'rgba(0,0,0,' + vigAlpha + ')');
-    lctx.fillStyle = vig;
+    var vigKey = Math.round(vigAlpha * 100);
+    if (this._nightVigKey !== vigKey || this._nightVigW !== w) {
+        this._nightVigKey = vigKey;
+        this._nightVigW = w;
+        var cx = w / 2, cy = h / 2;
+        var r = Math.max(w, h) * 0.6;
+        this._nightVig = lctx.createRadialGradient(cx, cy, r * 0.5, cx, cy, r);
+        this._nightVig.addColorStop(0, 'rgba(0,0,0,0)');
+        this._nightVig.addColorStop(1, 'rgba(0,0,0,' + vigAlpha + ')');
+    }
+    lctx.fillStyle = this._nightVig;
     lctx.fillRect(0, 0, w, h);
 
     lctx.globalCompositeOperation = 'destination-out';
@@ -5886,51 +6092,74 @@ TWB.Game.prototype.drawLighting = function() {
             case 3: angle = 0; break;
             default: angle = Math.PI / 2;
         }
-        var reach = 140;
-        var spread = 0.45;
-        var strength = overlayA > 0.4 ? 0.85 : (overlayA > 0.1 ? 0.6 : 0.3);
-        var grad = lctx.createRadialGradient(px, py, 4, px + Math.cos(angle) * 50, py + Math.sin(angle) * 50, reach);
-        grad.addColorStop(0, 'rgba(0,0,0,' + strength + ')');
-        grad.addColorStop(0.5, 'rgba(0,0,0,' + (strength * 0.6) + ')');
-        grad.addColorStop(1, 'rgba(0,0,0,0)');
-        lctx.beginPath();
-        lctx.moveTo(px, py);
-        lctx.arc(px, py, reach, angle - spread, angle + spread);
-        lctx.closePath();
-        lctx.fillStyle = grad;
-        lctx.fill();
-
-        var glow = lctx.createRadialGradient(px, py, 0, px, py, 35);
-        glow.addColorStop(0, 'rgba(0,0,0,' + (strength * 0.5) + ')');
-        glow.addColorStop(1, 'rgba(0,0,0,0)');
-        lctx.fillStyle = glow;
-        lctx.fillRect(px - 35, py - 35, 70, 70);
+        var strengthKey = overlayA > 0.4 ? 2 : (overlayA > 0.1 ? 1 : 0);
+        var flashKey = p.dir * 3 + strengthKey;
+        if (this._flashKey !== flashKey) {
+            this._flashKey = flashKey;
+            if (!this._flashCanvas) {
+                this._flashCanvas = document.createElement('canvas');
+                this._flashCanvas.width = 300;
+                this._flashCanvas.height = 300;
+            }
+            var fctx = this._flashCanvas.getContext('2d');
+            fctx.clearRect(0, 0, 300, 300);
+            var fcx = 150, fcy = 150;
+            var str = [0.3, 0.6, 0.85][strengthKey];
+            var fg = fctx.createRadialGradient(fcx, fcy, 4, fcx + Math.cos(angle) * 50, fcy + Math.sin(angle) * 50, 140);
+            fg.addColorStop(0, 'rgba(0,0,0,' + str + ')');
+            fg.addColorStop(0.5, 'rgba(0,0,0,' + (str * 0.6) + ')');
+            fg.addColorStop(1, 'rgba(0,0,0,0)');
+            fctx.beginPath();
+            fctx.moveTo(fcx, fcy);
+            fctx.arc(fcx, fcy, 140, angle - 0.45, angle + 0.45);
+            fctx.closePath();
+            fctx.fillStyle = fg;
+            fctx.fill();
+            var fg2 = fctx.createRadialGradient(fcx, fcy, 0, fcx, fcy, 35);
+            fg2.addColorStop(0, 'rgba(0,0,0,' + (str * 0.5) + ')');
+            fg2.addColorStop(1, 'rgba(0,0,0,0)');
+            fctx.fillStyle = fg2;
+            fctx.fillRect(fcx - 35, fcy - 35, 70, 70);
+        }
+        lctx.drawImage(this._flashCanvas, px - 150, py - 150);
     } else if (!this.indoors && overlayA > 0.3) {
         var ep = this.player;
         var epx = Math.floor(ep.x - this.camera.x);
         var epy = Math.floor(ep.y - this.camera.y);
-        var emGlow = lctx.createRadialGradient(epx, epy, 0, epx, epy, 20);
-        emGlow.addColorStop(0, 'rgba(0,0,0,0.15)');
-        emGlow.addColorStop(1, 'rgba(0,0,0,0)');
-        lctx.fillStyle = emGlow;
-        lctx.fillRect(epx - 20, epy - 20, 40, 40);
+        if (!this._emGlow) {
+            var emc = document.createElement('canvas');
+            emc.width = 40; emc.height = 40;
+            var emctx = emc.getContext('2d');
+            var emg = emctx.createRadialGradient(20, 20, 0, 20, 20, 20);
+            emg.addColorStop(0, 'rgba(0,0,0,0.15)');
+            emg.addColorStop(1, 'rgba(0,0,0,0)');
+            emctx.fillStyle = emg;
+            emctx.fillRect(0, 0, 40, 40);
+            this._emGlow = emc;
+        }
+        lctx.drawImage(this._emGlow, epx - 20, epy - 20);
     }
 
     if (!this.indoors && this.fireFuel > 0) {
-        var campfire = null;
-        for (var i = 0; i < this.objects.length; i++) {
-            if (this.objects[i].type === 'campfire') { campfire = this.objects[i]; break; }
-        }
+        var campfire = this._campfires.length > 0 ? this._campfires[0] : null;
         if (campfire) {
             var fx = Math.floor(campfire.x - this.camera.x);
             var fy = Math.floor(campfire.y - this.camera.y);
-            var fireR = 60 + (this.fireFuel / 100) * 40;
-            var fireGrad = lctx.createRadialGradient(fx, fy, 0, fx, fy, fireR);
-            fireGrad.addColorStop(0, 'rgba(0,0,0,0.7)');
-            fireGrad.addColorStop(0.5, 'rgba(0,0,0,0.3)');
-            fireGrad.addColorStop(1, 'rgba(0,0,0,0)');
-            lctx.fillStyle = fireGrad;
-            lctx.fillRect(fx - fireR, fy - fireR, fireR * 2, fireR * 2);
+            var fireR = Math.round(60 + (this.fireFuel / 100) * 40);
+            if (this._fireGlowR !== fireR) {
+                this._fireGlowR = fireR;
+                var s = fireR * 2;
+                if (!this._fireGlowC) { this._fireGlowC = document.createElement('canvas'); }
+                this._fireGlowC.width = s; this._fireGlowC.height = s;
+                var fgc = this._fireGlowC.getContext('2d');
+                var fgg = fgc.createRadialGradient(fireR, fireR, 0, fireR, fireR, fireR);
+                fgg.addColorStop(0, 'rgba(0,0,0,0.7)');
+                fgg.addColorStop(0.5, 'rgba(0,0,0,0.3)');
+                fgg.addColorStop(1, 'rgba(0,0,0,0)');
+                fgc.fillStyle = fgg;
+                fgc.fillRect(0, 0, s, s);
+            }
+            lctx.drawImage(this._fireGlowC, fx - fireR, fy - fireR);
         }
     }
 
@@ -5939,32 +6168,71 @@ TWB.Game.prototype.drawLighting = function() {
         var fpy = 1 * TWB.TILE + 24;
         var spx = fpx - this.camera.x;
         var spy = fpy - this.camera.y;
-        var fpR = 50 + (this.fireplaceFuel / 100) * 30;
-        var fpGrad = lctx.createRadialGradient(spx, spy, 0, spx, spy, fpR);
-        fpGrad.addColorStop(0, 'rgba(0,0,0,0.6)');
-        fpGrad.addColorStop(0.5, 'rgba(0,0,0,0.3)');
-        fpGrad.addColorStop(1, 'rgba(0,0,0,0)');
-        lctx.fillStyle = fpGrad;
-        lctx.fillRect(spx - fpR, spy - fpR, fpR * 2, fpR * 2);
+        var fpR = Math.round(50 + (this.fireplaceFuel / 100) * 30);
+        if (this._fpGlowR !== fpR) {
+            this._fpGlowR = fpR;
+            var fs = fpR * 2;
+            if (!this._fpGlowC) { this._fpGlowC = document.createElement('canvas'); }
+            this._fpGlowC.width = fs; this._fpGlowC.height = fs;
+            var fpc = this._fpGlowC.getContext('2d');
+            var fpg = fpc.createRadialGradient(fpR, fpR, 0, fpR, fpR, fpR);
+            fpg.addColorStop(0, 'rgba(0,0,0,0.6)');
+            fpg.addColorStop(0.5, 'rgba(0,0,0,0.3)');
+            fpg.addColorStop(1, 'rgba(0,0,0,0)');
+            fpc.fillStyle = fpg;
+            fpc.fillRect(0, 0, fs, fs);
+        }
+        lctx.drawImage(this._fpGlowC, spx - fpR, spy - fpR);
     }
 
     if (!this.indoors) {
-        for (var sli = 0; sli < this.objects.length; sli++) {
-            var sl = this.objects[sli];
-            if ((sl.type !== 'shrine' && sl.type !== 'curse_shrine') || !sl.lit) continue;
+        for (var sli = 0; sli < this._shrines.length; sli++) {
+            var sl = this._shrines[sli];
+            if (!sl.lit) continue;
             var slx = Math.floor(sl.x - this.camera.x);
             var sly = Math.floor(sl.y - this.camera.y) - 10;
-            var slR = 50 + Math.min(1, sl.litFuel / 200) * 30;
-            var slGrad = lctx.createRadialGradient(slx, sly, 0, slx, sly, slR);
-            slGrad.addColorStop(0, 'rgba(0,0,0,0.65)');
-            slGrad.addColorStop(0.5, 'rgba(0,0,0,0.3)');
-            slGrad.addColorStop(1, 'rgba(0,0,0,0)');
-            lctx.fillStyle = slGrad;
-            lctx.fillRect(slx - slR, sly - slR, slR * 2, slR * 2);
+            var slR = Math.round(50 + Math.min(1, sl.litFuel / 200) * 30);
+            if (!sl._glowC || sl._glowR !== slR) {
+                sl._glowR = slR;
+                var ss = slR * 2;
+                if (!sl._glowC) { sl._glowC = document.createElement('canvas'); }
+                sl._glowC.width = ss; sl._glowC.height = ss;
+                var slc = sl._glowC.getContext('2d');
+                var slg = slc.createRadialGradient(slR, slR, 0, slR, slR, slR);
+                slg.addColorStop(0, 'rgba(0,0,0,0.65)');
+                slg.addColorStop(0.5, 'rgba(0,0,0,0.3)');
+                slg.addColorStop(1, 'rgba(0,0,0,0)');
+                slc.fillStyle = slg;
+                slc.fillRect(0, 0, ss, ss);
+            }
+            lctx.drawImage(sl._glowC, slx - slR, sly - slR);
         }
     }
 
     lctx.globalCompositeOperation = 'source-over';
+
+    var exposure = this.getExposureState();
+    if (exposure.level > 0) {
+        var coldIntensity = exposure.level / 4;
+        var blueA = coldIntensity * 0.2;
+        if (exposure.level >= 3) blueA += 0.05 + Math.sin(this.gameTime * 0.02) * 0.03;
+        lctx.fillStyle = 'rgba(30,50,120,' + blueA.toFixed(3) + ')';
+        lctx.fillRect(0, 0, w, h);
+        if (this._coldVigLevel !== exposure.level || this._coldVigW !== w) {
+            this._coldVigLevel = exposure.level;
+            this._coldVigW = w;
+            var edgeAlpha = coldIntensity * 0.35;
+            var cvg = lctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.25, w / 2, h / 2, Math.max(w, h) * 0.65);
+            cvg.addColorStop(0, 'rgba(100,150,220,0)');
+            cvg.addColorStop(1, 'rgba(100,150,220,' + edgeAlpha + ')');
+            this._coldVigGrad = cvg;
+        }
+        lctx.fillStyle = this._coldVigGrad;
+        lctx.fillRect(0, 0, w, h);
+        this._coldInLighting = true;
+    } else {
+        this._coldInLighting = false;
+    }
 
     ctx.drawImage(lc, 0, 0);
 
@@ -5980,19 +6248,32 @@ TWB.Game.prototype.drawLighting = function() {
             case 3: angle = 0; break;
             default: angle = Math.PI / 2;
         }
+        var warmKey = p.dir * 2 + (overlayA > 0.4 ? 1 : 0);
+        if (this._warmKey !== warmKey) {
+            this._warmKey = warmKey;
+            if (!this._warmCanvas) {
+                this._warmCanvas = document.createElement('canvas');
+                this._warmCanvas.width = 300;
+                this._warmCanvas.height = 300;
+            }
+            var wctx = this._warmCanvas.getContext('2d');
+            wctx.clearRect(0, 0, 300, 300);
+            var wcx = 150, wcy = 150;
+            var warmA = overlayA > 0.4 ? 0.08 : 0.04;
+            var wg = wctx.createRadialGradient(wcx, wcy, 4, wcx + Math.cos(angle) * 50, wcy + Math.sin(angle) * 50, 140);
+            wg.addColorStop(0, 'rgba(255,240,200,' + warmA + ')');
+            wg.addColorStop(0.5, 'rgba(255,230,180,' + (warmA * 0.5) + ')');
+            wg.addColorStop(1, 'rgba(255,220,160,0)');
+            wctx.beginPath();
+            wctx.moveTo(wcx, wcy);
+            wctx.arc(wcx, wcy, 140, angle - 0.45, angle + 0.45);
+            wctx.closePath();
+            wctx.fillStyle = wg;
+            wctx.fill();
+        }
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
-        var warmGrad = ctx.createRadialGradient(px, py, 4, px + Math.cos(angle) * 50, py + Math.sin(angle) * 50, 140);
-        var warmA = overlayA > 0.4 ? 0.08 : 0.04;
-        warmGrad.addColorStop(0, 'rgba(255,240,200,' + warmA + ')');
-        warmGrad.addColorStop(0.5, 'rgba(255,230,180,' + (warmA * 0.5) + ')');
-        warmGrad.addColorStop(1, 'rgba(255,220,160,0)');
-        ctx.beginPath();
-        ctx.moveTo(px, py);
-        ctx.arc(px, py, 140, angle - 0.45, angle + 0.45);
-        ctx.closePath();
-        ctx.fillStyle = warmGrad;
-        ctx.fill();
+        ctx.drawImage(this._warmCanvas, px - 150, py - 150);
         ctx.restore();
     }
 };
@@ -6184,12 +6465,11 @@ TWB.Game.prototype.drawRain = function() {
     ctx.save();
     ctx.strokeStyle = 'rgba(160,180,200,0.25)';
     ctx.lineWidth = 1;
+    ctx.beginPath();
     for (var i = 0; i < this.rainDrops.length; i++) {
         var d = this.rainDrops[i];
-        ctx.beginPath();
         ctx.moveTo(d.x, d.y);
         ctx.lineTo(d.x - 1, d.y + d.len);
-        ctx.stroke();
         d.y += d.speed;
         d.x -= 0.3;
         if (d.y > h) {
@@ -6197,6 +6477,7 @@ TWB.Game.prototype.drawRain = function() {
             d.x = Math.random() * w;
         }
     }
+    ctx.stroke();
     ctx.restore();
 
     ctx.fillStyle = 'rgba(30,40,60,0.08)';
@@ -6220,13 +6501,12 @@ TWB.Game.prototype.drawSnow = function() {
     }
 
     ctx.save();
+    ctx.fillStyle = 'rgba(220,220,230,0.55)';
+    ctx.beginPath();
     for (var i = 0; i < this.snowFlakes.length; i++) {
         var f = this.snowFlakes[i];
-        var alpha = 0.4 + f.r * 0.15;
-        ctx.fillStyle = 'rgba(220,220,230,' + alpha.toFixed(2) + ')';
-        ctx.beginPath();
+        ctx.moveTo(f.x + f.r, f.y);
         ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2);
-        ctx.fill();
         f.y += f.speed;
         f.wobble += 0.03;
         f.x += f.drift + Math.sin(f.wobble) * 0.3;
@@ -6237,6 +6517,7 @@ TWB.Game.prototype.drawSnow = function() {
         if (f.x < -5) f.x = w + 3;
         if (f.x > w + 5) f.x = -3;
     }
+    ctx.fill();
     ctx.restore();
 
     ctx.fillStyle = 'rgba(180,185,200,0.04)';
@@ -6264,22 +6545,27 @@ TWB.Game.prototype.drawFog = function() {
     fc.fillStyle = 'rgba(175,178,168,' + (d * 0.88) + ')';
     fc.fillRect(0, 0, w, h);
 
+    var dKey = Math.round(d * 100);
+    if (this._fogClearKey !== dKey || this._fogClearW !== w) {
+        this._fogClearKey = dKey;
+        this._fogClearW = w;
+        this._fogClearGrad = fc.createRadialGradient(cx, cy, 0, cx, cy, clearR * 1.8);
+        this._fogClearGrad.addColorStop(0, 'rgba(0,0,0,' + Math.min(0.95, d * 0.95) + ')');
+        this._fogClearGrad.addColorStop(0.25, 'rgba(0,0,0,' + (d * 0.85) + ')');
+        this._fogClearGrad.addColorStop(0.5, 'rgba(0,0,0,' + (d * 0.5) + ')');
+        this._fogClearGrad.addColorStop(0.75, 'rgba(0,0,0,' + (d * 0.15) + ')');
+        this._fogClearGrad.addColorStop(1, 'rgba(0,0,0,0)');
+    }
     fc.globalCompositeOperation = 'destination-out';
-    var fogGrad = fc.createRadialGradient(cx, cy, 0, cx, cy, clearR * 1.8);
-    fogGrad.addColorStop(0, 'rgba(0,0,0,' + Math.min(0.95, d * 0.95) + ')');
-    fogGrad.addColorStop(0.25, 'rgba(0,0,0,' + (d * 0.85) + ')');
-    fogGrad.addColorStop(0.5, 'rgba(0,0,0,' + (d * 0.5) + ')');
-    fogGrad.addColorStop(0.75, 'rgba(0,0,0,' + (d * 0.15) + ')');
-    fogGrad.addColorStop(1, 'rgba(0,0,0,0)');
-    fc.fillStyle = fogGrad;
+    fc.fillStyle = this._fogClearGrad;
     fc.fillRect(0, 0, w, h);
 
-    for (var gi = 0; gi < 20; gi++) {
+    for (var gi = 0; gi < 8; gi++) {
         var seed = TWB.hash(gi * 31, Math.floor(t / 200) + gi * 7);
         var gx = seed % w;
         var gy = TWB.hash(seed, gi * 47) % h;
-        var gr = 8 + seed % 18;
-        var ga = d * (0.12 + (seed % 10) * 0.008);
+        var gr = 12 + seed % 24;
+        var ga = d * (0.15 + (seed % 10) * 0.01);
         var gap = fc.createRadialGradient(gx, gy, 0, gx, gy, gr);
         gap.addColorStop(0, 'rgba(0,0,0,' + ga + ')');
         gap.addColorStop(1, 'rgba(0,0,0,0)');
@@ -6289,11 +6575,11 @@ TWB.Game.prototype.drawFog = function() {
 
     fc.globalCompositeOperation = 'source-over';
 
-    for (var i = 0; i < 14; i++) {
+    for (var i = 0; i < 6; i++) {
         var fx = (TWB.hash(i * 17, Math.floor(t / 150)) % w);
         var fy = (TWB.hash(Math.floor(t / 150), i * 23) % h);
-        var fr = 70 + TWB.hash(i, i * 3) % 80;
-        var fa = d * (0.1 + Math.sin(t * 0.002 + i * 0.7) * 0.04);
+        var fr = 90 + TWB.hash(i, i * 3) % 100;
+        var fa = d * (0.12 + Math.sin(t * 0.002 + i * 0.7) * 0.05);
         var drift = fc.createRadialGradient(fx, fy, 0, fx, fy, fr);
         drift.addColorStop(0, 'rgba(185,185,178,' + fa + ')');
         drift.addColorStop(0.6, 'rgba(180,180,172,' + (fa * 0.4) + ')');
@@ -6708,6 +6994,10 @@ TWB.Game.prototype.drawMap = function() {
     var cw = this.canvas.width;
     var ch = this.canvas.height;
 
+    if (!this._mapFontReady && document.fonts && document.fonts.check('14px "Short Stack"')) {
+        this._mapFontReady = true;
+        this._mapCanvas = null;
+    }
     if (!this._mapCanvas) {
         this._mapCanvas = document.createElement('canvas');
         this._mapCanvas.width = cw;
@@ -6723,7 +7013,7 @@ TWB.Game.prototype.drawMap = function() {
         var qsx = qmW / TWB.COLS, qsy = qmH / TWB.ROWS;
 
         for (var qmi = 0; qmi < this.questShrines.length; qmi++) {
-            var qsh = this.objects[this.questShrines[qmi]];
+            var qsh = this.questShrines[qmi];
             if (!qsh) continue;
             var qshx = qmX + (qsh.x / TWB.TILE) * qsx;
             var qshy = qmY + (qsh.y / TWB.TILE) * qsy;
@@ -7224,7 +7514,7 @@ TWB.Game.prototype._renderMapStatic = function(ctx, cw, ch) {
     ctx.save();
     ctx.translate(scx, scy - 18);
     ctx.rotate(-0.04);
-    ctx.font = 'italic 8px Georgia, "Times New Roman", serif';
+    ctx.font = '14px "Short Stack", cursive';
     ctx.textAlign = 'center';
     ctx.fillStyle = ink;
     ctx.fillText('You are here', 0, 0);
@@ -7237,7 +7527,10 @@ TWB.Game.prototype._renderMapStatic = function(ctx, cw, ch) {
         var tcOffX = ((tch % 31) - 15) * sx;
         var tcOffY = (((tch >>> 8) % 31) - 15) * sy;
         var tcx = mapX + tc.cx * sx + tcOffX, tcy = mapY + tc.cy * sy + tcOffY;
-        if (ms.x_marker) ctx.drawImage(ms.x_marker, Math.floor(tcx - ms.x_marker.width / 2), Math.floor(tcy - ms.x_marker.height - 8));
+        if (ms.x_marker) {
+            var xmW = ms.x_marker.width * 2, xmH = ms.x_marker.height * 2;
+            ctx.drawImage(ms.x_marker, Math.floor(tcx - xmW / 2), Math.floor(tcy - xmH - 8), xmW, xmH);
+        }
     }
 
     if (ms.compass_rose) {
@@ -7971,13 +8264,8 @@ TWB.Game.prototype.drawFates = function() {
     if (progress < 1) {
         var staticH = Math.min(40, ch - scanY);
         if (staticH > 0) {
-            var sd = ctx.getImageData(0, scanY, cw, staticH);
-            var px = sd.data;
-            for (var i = 0; i < px.length; i += 4) {
-                var v = Math.floor(Math.random() * 40);
-                px[i] = v; px[i+1] = 0; px[i+2] = v + 10; px[i+3] = 255;
-            }
-            ctx.putImageData(sd, 0, scanY);
+            var nc4 = this._getStaticNoise(cw, true);
+            ctx.drawImage(nc4, 0, 0, cw, staticH, 0, scanY, cw, staticH);
         }
     }
 
@@ -8152,32 +8440,32 @@ TWB.Game.prototype.drawHUD = function() {
 
     if (showBp) {
         var bpX = sep1 + pad;
+        var usedSlots = 0;
+        for (var bci = 0; bci < this.backpack.length; bci++) { if (this.backpack[bci]) usedSlots++; }
         ctx.font = TWB.FONT_SM;
         ctx.fillStyle = TWB.CLR_GOLD;
         ctx.fillText('BACKPACK [TAB]', bpX, hudY + pad);
+        ctx.fillStyle = TWB.CLR_TEXT_GRAY;
+        ctx.fillText(' - ' + usedSlots + '/10', bpX + ctx.measureText('BACKPACK [TAB]').width, hudY + pad);
         var col1x = bpX;
         var col2x = bpX + Math.floor(sec2W / 2);
         var itemRow = 0;
-        var usedSlots = 0;
-        var itemGap = Math.floor((hudH - pad * 2 - 24) / 4);
+        var itemGap = Math.floor((hudH - pad * 2 - 14) / 5);
         for (var bi = 0; bi < this.backpack.length; bi++) {
             var slot = this.backpack[bi];
             if (slot) {
-                var colX = itemRow < 4 ? col1x : col2x;
-                var rowY = hudY + pad + 14 + (itemRow < 4 ? itemRow : itemRow - 4) * itemGap;
+                var colX = itemRow < 5 ? col1x : col2x;
+                var rowY = hudY + pad + 14 + (itemRow < 5 ? itemRow : itemRow - 5) * itemGap;
                 var label = (TWB.ITEM_LABELS[slot.type] || slot.type) + ': ' + slot.count;
                 ctx.fillStyle = TWB.CLR_TEXT_LIGHT;
                 ctx.fillText(label, colX, rowY);
                 itemRow++;
-                usedSlots++;
             }
         }
         if (usedSlots === 0) {
             ctx.fillStyle = TWB.CLR_TEXT_DARK;
             ctx.fillText('Empty', col1x, hudY + pad + 20);
         }
-        ctx.fillStyle = TWB.CLR_TEXT_GRAY;
-        ctx.fillText(usedSlots + '/10 slots', bpX, hudY + hudH - pad - 8);
 
         ctx.fillStyle = TWB.CLR_BORDER;
         ctx.fillRect(sep2, hudY + pad, 1, hudH - pad * 2);

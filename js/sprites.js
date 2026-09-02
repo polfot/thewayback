@@ -1183,9 +1183,9 @@ function drawShadowSprite(ctx) {
     px(ctx, 0, 18, 2, 1, '#03030a');
     px(ctx, 4, 18, 2, 1, '#03030a');
     px(ctx, 8, 18, 2, 1, '#03030a');
-    px(ctx, 1, 19, 1, 1, '#02020808');
-    px(ctx, 5, 19, 1, 1, '#02020808');
-    px(ctx, 9, 19, 1, 1, '#02020808');
+    px(ctx, 1, 19, 1, 1, '#020208');
+    px(ctx, 5, 19, 1, 1, '#020208');
+    px(ctx, 9, 19, 1, 1, '#020208');
 }
 
 function drawFatesSprite(ctx) {
